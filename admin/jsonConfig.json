@@ -147,6 +147,16 @@
             "lg": 3,
             "xl": 3
         },
+        "refreshToken": {
+            "newLine": true,
+            "type": "text",
+            "label": "Password_Token",
+            "xs": 12,
+            "sm": 12,
+            "md": 6,
+            "lg": 5,
+            "xl": 5
+        },
         "client_secret": {
             "newLine": true,
             "type": "text",
@@ -156,7 +166,8 @@
             "sm": 12,
             "md": 6,
             "lg": 5,
-            "xl": 5
+            "xl": 5,
+            "hidden": true
         },
         "tokenExpiry": {
             "type": "text",
@@ -174,7 +185,7 @@
             "label": "Fetch / refresh token now",
             "command": "fetchToken",
             "data": {},
-            "result": "client_secret",
+            "result": "refreshToken",
             "xs": 12,
             "sm": 12,
             "md": 4,

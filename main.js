@@ -297,19 +297,25 @@ class Bluelink extends utils.Adapter {
     }
 
     /**
-     * Read the active refresh token: prefer auto-fetched token from file,
-     * fall back to manually entered token from config (client_secret).
+     * Read the active refresh token.
+     * Priority: 1) GUI-saved refreshToken field  2) JSON file  3) legacy client_secret
      *
      * @returns {{ token: string, expiry: string }}
      */
     async getStoredToken() {
+        // 1) GUI refreshToken field (non-encrypted, set by the fetch button)
+        if (this.config.refreshToken && String(this.config.refreshToken).length >= 100) {
+            return { token: this.config.refreshToken, expiry: this.config.tokenExpiry || '' };
+        }
+        // 2) JSON file written by saveToken()
         try {
             const raw  = fs.readFileSync(this._tokenFilePath(), 'utf-8');
             const data = JSON.parse(raw);
             if (data && data.token && String(data.token).length >= 100) {
                 return { token: data.token, expiry: data.expiry || '' };
             }
-        } catch (_) { /* file doesn't exist yet or unreadable */ }
+        } catch (_) { /* file doesn't exist yet */ }
+        // 3) Legacy: manually entered encrypted client_secret field
         return { token: this.config.client_secret || '', expiry: '' };
     }
 
@@ -414,8 +420,8 @@ return;
      */
     async login() {
         try {
-            const activeToken = this._activeRefreshToken || this.config.client_secret || '';
-            this.log.info(`Login to api – token source: ${this._activeRefreshToken ? 'state(auto)' : 'config(manual)'}, tokenLen=${activeToken.length}`);
+            const activeToken = this._activeRefreshToken || this.config.refreshToken || this.config.client_secret || '';
+            this.log.info(`Login to api – token source: ${this._activeRefreshToken ? 'file/auto' : this.config.refreshToken ? 'config(refreshToken)' : 'config(client_secret)'}, tokenLen=${activeToken.length}`);
 
             const loginOptions = {
                 username: this.config.username,

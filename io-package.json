@@ -173,6 +173,7 @@
   "native": {
     "username": "",
     "password": "",
+    "refreshToken": "",
     "client_secret": "",
     "client_secret_pin": "",
     "tokenExpiry": "",
