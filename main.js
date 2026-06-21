@@ -288,9 +288,13 @@ class Bluelink extends utils.Adapter {
      */
     async ensureRefreshToken() {
         const hasToken = !!this.config.client_secret;
-        const expiringSoon = tokenManager.isExpiringSoon(this.config.tokenExpiry);
 
-        if (hasToken && !expiringSoon) return;
+        // If a token exists but tokenExpiry is missing (migration from old config), keep the token as-is.
+        // Only replace when tokenExpiry is explicitly set AND < 14 days away.
+        const hasExpiry = !!this.config.tokenExpiry;
+        const expiringSoon = hasExpiry && tokenManager.isExpiringSoon(this.config.tokenExpiry);
+
+        if (hasToken && (!hasExpiry || !expiringSoon)) return;
 
         if (!this.config.password) {
             if (!hasToken) {
