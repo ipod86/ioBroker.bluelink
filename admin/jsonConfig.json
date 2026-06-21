@@ -157,7 +157,8 @@
             "lg": 5,
             "xl": 5,
             "disabled": true,
-            "help": "fetchTokenHelp"
+            "help": "fetchTokenHelp",
+            "hidden": true
         },
         "client_secret": {
             "newLine": true,
