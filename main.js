@@ -2,8 +2,6 @@
 
 const utils = require('@iobroker/adapter-core');
 const { BlueLinky } = require('bluelinky');
-const fs = require('fs');
-const path = require('path');
 
 const Json2iob = require('./lib/json2iob');
 const tools = require('./lib/tools');
@@ -102,7 +100,6 @@ class Bluelink extends utils.Adapter {
         }
 
         if (loginGo) {
-            await this.ensureRefreshToken();
             await this.login();
         }
     }
@@ -285,88 +282,6 @@ class Bluelink extends utils.Adapter {
     }
 
     /**
-     * Fetch a new refresh token if none is stored or it expires within 14 days.
-     * Requires this.config.password (actual account password) to be set.
-     */
-    /** Path to the token cache file in ioBroker's data directory. */
-    _tokenFilePath() {
-        const dataDir = utils.getAbsoluteDefaultDataDir
-            ? utils.getAbsoluteDefaultDataDir()
-            : path.join(__dirname, '..', '..', 'iobroker-data');
-        return path.join(dataDir, `bluelink.${this.instance}.token.json`);
-    }
-
-    /**
-     * Read the active refresh token.
-     * Priority: 1) GUI-saved refreshToken field  2) JSON file  3) legacy client_secret
-     *
-     * @returns {{ token: string, expiry: string }}
-     */
-    async getStoredToken() {
-        // 1) GUI refreshToken field (non-encrypted, set by the fetch button)
-        if (this.config.refreshToken && String(this.config.refreshToken).length >= 100) {
-            return { token: this.config.refreshToken, expiry: this.config.tokenExpiry || '' };
-        }
-        // 2) JSON file written by saveToken()
-        try {
-            const raw  = fs.readFileSync(this._tokenFilePath(), 'utf-8');
-            const data = JSON.parse(raw);
-            if (data && data.token && String(data.token).length >= 100) {
-                return { token: data.token, expiry: data.expiry || '' };
-            }
-        } catch (_) { /* file doesn't exist yet */ }
-        // 3) Legacy: manually entered encrypted client_secret field
-        return { token: this.config.client_secret || '', expiry: '' };
-    }
-
-    /**
-     * Persist auto-fetched token to a local JSON file.
-     *
-     * @param refreshToken
-     * @param expiresAt
-     */
-    async saveToken(refreshToken, expiresAt) {
-        const filePath = this._tokenFilePath();
-        fs.writeFileSync(filePath, JSON.stringify({ token: refreshToken, expiry: expiresAt }), 'utf-8');
-        await this.setStateAsync('info.tokenExpiry', expiresAt, true);
-        this._activeRefreshToken = refreshToken;
-        this._activeTokenExpiry  = expiresAt;
-        this.log.info(`[saveToken] Written to ${filePath} (tokenLen=${refreshToken.length})`);
-    }
-
-    async ensureRefreshToken() {
-        const { token, expiry } = await this.getStoredToken();
-        this._activeRefreshToken = token;
-        this._activeTokenExpiry  = expiry;
-
-        const hasToken     = !!token;
-        const hasExpiry    = !!expiry;
-        const expiringSoon = hasExpiry && tokenManager.isExpiringSoon(expiry);
-
-        this.log.info(`[ensureRefreshToken] hasToken=${hasToken} hasExpiry=${hasExpiry} expiringSoon=${expiringSoon} tokenLen=${token.length}`);
-
-        // Keep existing token if it has no expiry (manual entry / migration) or is not expiring soon
-        if (hasToken && (!hasExpiry || !expiringSoon)) {
-return;
-}
-
-        if (!this.config.password) {
-            if (!hasToken) {
-                this.log.error('No refresh token and no password configured. Enter your account password in the adapter settings.');
-            }
-            return;
-        }
-
-        this.log.info(hasToken ? 'Refresh token expires soon – fetching new one' : 'No refresh token – fetching from Hyundai/Kia');
-        try {
-            const result = await tokenManager.fetchToken(this.config.brand, this.config.username, this.config.password, msg => this.log.info(msg));
-            await this.saveToken(result.refreshToken, result.expiresAt);
-            this.log.info(`New refresh token obtained, valid until ${result.expiresAt}`);
-        } catch (err) {
-            this.log.error(`Failed to fetch refresh token: ${err.message || err}`);
-        }
-    }
-
     /**
      * Handle sendTo messages from admin UI.
      *
@@ -402,10 +317,8 @@ return;
 
             // Run async fetch, always call respond regardless of outcome
             tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg))
-                .then(async (result) => {
+                .then((result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                    await this.saveToken(result.refreshToken, result.expiresAt);
-                    this.log.info('[fetchToken] Token saved');
                     respond(result.refreshToken);
                 })
                 .catch((err) => {
@@ -420,8 +333,8 @@ return;
      */
     async login() {
         try {
-            const activeToken = this._activeRefreshToken || this.config.refreshToken || this.config.client_secret || '';
-            this.log.info(`Login to api – token source: ${this._activeRefreshToken ? 'file/auto' : this.config.refreshToken ? 'config(refreshToken)' : 'config(client_secret)'}, tokenLen=${activeToken.length}`);
+            const activeToken = this.config.refreshToken || this.config.client_secret || '';
+            this.log.info(`Login to api – token source: ${this.config.refreshToken ? 'refreshToken' : 'client_secret(legacy)'}, tokenLen=${activeToken.length}`);
 
             const loginOptions = {
                 username: this.config.username,
