@@ -174,12 +174,18 @@
             "label": "Fetch / refresh token now",
             "command": "fetchToken",
             "data": {},
-            "result": "_fetchTokenResult",
+            "result": "client_secret",
             "xs": 12,
             "sm": 12,
             "md": 4,
             "lg": 3,
             "xl": 3
+        },
+        "_fetchTokenStatus": {
+            "type": "staticText",
+            "text": "After fetching: click Save to store the token permanently.",
+            "newLine": true,
+            "xs": 12
         },
         "Api settings": {
             "type": "header",

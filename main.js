@@ -299,6 +299,7 @@ class Bluelink extends utils.Adapter {
     /**
      * Read the active refresh token: prefer auto-fetched token from file,
      * fall back to manually entered token from config (client_secret).
+     *
      * @returns {{ token: string, expiry: string }}
      */
     async getStoredToken() {
@@ -312,7 +313,12 @@ class Bluelink extends utils.Adapter {
         return { token: this.config.client_secret || '', expiry: '' };
     }
 
-    /** Persist auto-fetched token to a local JSON file. */
+    /**
+     * Persist auto-fetched token to a local JSON file.
+     *
+     * @param refreshToken
+     * @param expiresAt
+     */
     async saveToken(refreshToken, expiresAt) {
         const filePath = this._tokenFilePath();
         fs.writeFileSync(filePath, JSON.stringify({ token: refreshToken, expiry: expiresAt }), 'utf-8');
@@ -334,7 +340,9 @@ class Bluelink extends utils.Adapter {
         this.log.info(`[ensureRefreshToken] hasToken=${hasToken} hasExpiry=${hasExpiry} expiringSoon=${expiringSoon} tokenLen=${token.length}`);
 
         // Keep existing token if it has no expiry (manual entry / migration) or is not expiring soon
-        if (hasToken && (!hasExpiry || !expiringSoon)) return;
+        if (hasToken && (!hasExpiry || !expiringSoon)) {
+return;
+}
 
         if (!this.config.password) {
             if (!hasToken) {
@@ -355,10 +363,13 @@ class Bluelink extends utils.Adapter {
 
     /**
      * Handle sendTo messages from admin UI.
-     * @param {{ command: string, message: any, callback: function }} obj
+     *
+     * @param {{command: string, message: any, callback: Function}} obj
      */
     onMessage(obj) {
-        if (!obj || !obj.command) return;
+        if (!obj || !obj.command) {
+return;
+}
 
         if (obj.command === 'fetchToken') {
             this.log.info('[fetchToken] Message received from admin UI');
@@ -389,7 +400,7 @@ class Bluelink extends utils.Adapter {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
                     await this.saveToken(result.refreshToken, result.expiresAt);
                     this.log.info('[fetchToken] Token saved');
-                    respond({ result: `Token fetched successfully. Valid until ${result.expiresAt}. Restart the adapter to connect.` });
+                    respond({ result: result.refreshToken });
                 })
                 .catch((err) => {
                     this.log.error(`[fetchToken] Failed: ${err.message || err}`);
