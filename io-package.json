@@ -207,6 +207,19 @@
       "native": {}
     },
     {
+      "_id": "info.refreshToken",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "Auto-fetched refresh token (internal)",
+        "type": "string",
+        "read": false,
+        "write": false,
+        "def": ""
+      },
+      "native": {}
+    },
+    {
       "_id": "info.tokenExpiry",
       "type": "state",
       "common": {

@@ -286,14 +286,42 @@ class Bluelink extends utils.Adapter {
      * Fetch a new refresh token if none is stored or it expires within 14 days.
      * Requires this.config.password (actual account password) to be set.
      */
+    /**
+     * Read the active refresh token: prefer auto-fetched token from state,
+     * fall back to manually entered token from config (client_secret).
+     * @returns {{ token: string, expiry: string }}
+     */
+    async getStoredToken() {
+        try {
+            const tokenState  = await this.getStateAsync('info.refreshToken');
+            const expiryState = await this.getStateAsync('info.tokenExpiry');
+            if (tokenState && tokenState.val) {
+                return { token: tokenState.val, expiry: expiryState ? expiryState.val : '' };
+            }
+        } catch (_) { /* state might not exist yet */ }
+        return { token: this.config.client_secret || '', expiry: '' };
+    }
+
+    /** Persist auto-fetched token to states (no encrypted-native involved). */
+    async saveToken(refreshToken, expiresAt) {
+        await this.setStateAsync('info.refreshToken', refreshToken, true);
+        await this.setStateAsync('info.tokenExpiry',  expiresAt,    true);
+        this._activeRefreshToken = refreshToken;
+        this._activeTokenExpiry  = expiresAt;
+    }
+
     async ensureRefreshToken() {
-        const hasToken = !!this.config.client_secret;
+        const { token, expiry } = await this.getStoredToken();
+        this._activeRefreshToken = token;
+        this._activeTokenExpiry  = expiry;
 
-        // If a token exists but tokenExpiry is missing (migration from old config), keep the token as-is.
-        // Only replace when tokenExpiry is explicitly set AND < 14 days away.
-        const hasExpiry = !!this.config.tokenExpiry;
-        const expiringSoon = hasExpiry && tokenManager.isExpiringSoon(this.config.tokenExpiry);
+        const hasToken     = !!token;
+        const hasExpiry    = !!expiry;
+        const expiringSoon = hasExpiry && tokenManager.isExpiringSoon(expiry);
 
+        this.log.info(`[ensureRefreshToken] hasToken=${hasToken} hasExpiry=${hasExpiry} expiringSoon=${expiringSoon} tokenLen=${token.length}`);
+
+        // Keep existing token if it has no expiry (manual entry / migration) or is not expiring soon
         if (hasToken && (!hasExpiry || !expiringSoon)) return;
 
         if (!this.config.password) {
@@ -303,18 +331,10 @@ class Bluelink extends utils.Adapter {
             return;
         }
 
-        this.log.info(`${hasToken ? 'Refresh token expires soon – fetching new one' : 'No refresh token – fetching from Hyundai/Kia'}`);
+        this.log.info(hasToken ? 'Refresh token expires soon – fetching new one' : 'No refresh token – fetching from Hyundai/Kia');
         try {
             const result = await tokenManager.fetchToken(this.config.brand, this.config.username, this.config.password, msg => this.log.info(msg));
-            this.config.client_secret = result.refreshToken;
-            this.config.tokenExpiry = result.expiresAt;
-            await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, {
-                native: {
-                    client_secret: result.refreshToken,
-                    tokenExpiry: result.expiresAt,
-                },
-            });
-            await this.setStateAsync('info.tokenExpiry', result.expiresAt, true);
+            await this.saveToken(result.refreshToken, result.expiresAt);
             this.log.info(`New refresh token obtained, valid until ${result.expiresAt}`);
         } catch (err) {
             this.log.error(`Failed to fetch refresh token: ${err.message || err}`);
@@ -346,22 +366,10 @@ class Bluelink extends utils.Adapter {
 
             try {
                 const result = await tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg));
-
                 this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-
-                this.config.client_secret = result.refreshToken;
-                this.config.tokenExpiry   = result.expiresAt;
-
-                await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, {
-                    native: {
-                        client_secret: result.refreshToken,
-                        tokenExpiry:   result.expiresAt,
-                    },
-                });
-                await this.setStateAsync('info.tokenExpiry', result.expiresAt, true);
-                this.log.info('[fetchToken] Token saved to config and info.tokenExpiry state');
-
-                this.sendTo(obj.from, obj.command, { result: `Token successfully fetched. Valid until ${result.expiresAt}` }, obj.callback);
+                await this.saveToken(result.refreshToken, result.expiresAt);
+                this.log.info('[fetchToken] Token saved to info.refreshToken and info.tokenExpiry states');
+                this.sendTo(obj.from, obj.command, { result: `Token successfully fetched. Valid until ${result.expiresAt}. Restart the adapter to apply.` }, obj.callback);
             } catch (err) {
                 this.log.error(`[fetchToken] Failed: ${err.message || err}`);
                 this.sendTo(obj.from, obj.command, { error: `${err.message || err}` }, obj.callback);
@@ -374,11 +382,12 @@ class Bluelink extends utils.Adapter {
      */
     async login() {
         try {
-            this.log.info('Login to api');
+            const activeToken = this._activeRefreshToken || this.config.client_secret || '';
+            this.log.info(`Login to api – token source: ${this._activeRefreshToken ? 'state(auto)' : 'config(manual)'}, tokenLen=${activeToken.length}`);
 
             const loginOptions = {
                 username: this.config.username,
-                password: this.config.client_secret,
+                password: activeToken,
                 stamp: this.config.stamp,          // eigener Config-Key, nicht client_secret
                 pin: this.config.client_secret_pin,
                 brand: this.config.brand,
