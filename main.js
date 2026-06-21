@@ -73,6 +73,7 @@ class Bluelink extends utils.Adapter {
         this.slow_charging = 100;
         this.fast_charging = 100;
         this._renewalAttempted = false;
+        this._lastTokenCheck = 0;
     }
 
     async onReady() {
@@ -506,6 +507,13 @@ return;
                 }
             }
             await this.readStatusVin(vehicle,force_update_obj.val);
+        }
+
+        // Check token expiry once per day (not on every poll cycle)
+        const now = Date.now();
+        if (now - this._lastTokenCheck > 24 * 60 * 60 * 1000) {
+            this._lastTokenCheck = now;
+            await this.ensureRefreshToken();
         }
 
         //set ne cycle
