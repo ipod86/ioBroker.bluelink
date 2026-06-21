@@ -149,7 +149,7 @@
         },
         "client_secret": {
             "newLine": true,
-            "type": "password",
+            "type": "text",
             "label": "Password_Token",
             "repeat": false,
             "xs": 12,
