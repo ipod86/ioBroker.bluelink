@@ -6,6 +6,7 @@ const { BlueLinky } = require('bluelinky');
 const Json2iob = require('./lib/json2iob');
 const tools = require('./lib/tools');
 const Create_tools = require('./lib/create_tools').Create_tools;
+const tokenManager = require('./lib/tokenManager');
 
 const adapterIntervals = {}; //halten von allen Intervallen
 let request_count = 48; // halbstündig sollte als Standardeinstellung reichen (zu häufige Abfragen entleeren die Batterie spürbar)
@@ -61,6 +62,7 @@ class Bluelink extends utils.Adapter {
         this.on('ready', this.onReady.bind(this));
         this.on('stateChange', this.onStateChange.bind(this));
         this.on('unload', this.onUnload.bind(this));
+        this.on('message', this.onMessage.bind(this));
         this.vehiclesDict = {};
         this.batteryState12V = {};
         this.vehicles = [];
@@ -98,6 +100,7 @@ class Bluelink extends utils.Adapter {
         }
 
         if (loginGo) {
+            await this.ensureRefreshToken();
             await this.login();
         }
     }
@@ -275,6 +278,72 @@ class Bluelink extends utils.Adapter {
                 }
             } catch (err) {
                 this.log.error(`Error onStateChange ${err}`);
+            }
+        }
+    }
+
+    /**
+     * Fetch a new refresh token if none is stored or it expires within 14 days.
+     * Requires this.config.password (actual account password) to be set.
+     */
+    async ensureRefreshToken() {
+        const hasToken = !!this.config.client_secret;
+        const expiringSoon = tokenManager.isExpiringSoon(this.config.tokenExpiry);
+
+        if (hasToken && !expiringSoon) return;
+
+        if (!this.config.password) {
+            if (!hasToken) {
+                this.log.error('No refresh token and no password configured. Enter your account password in the adapter settings.');
+            }
+            return;
+        }
+
+        this.log.info(`${hasToken ? 'Refresh token expires soon – fetching new one' : 'No refresh token – fetching from Hyundai/Kia'}`);
+        try {
+            const result = await tokenManager.fetchToken(this.config.brand, this.config.username, this.config.password);
+            this.config.client_secret = result.refreshToken;
+            this.config.tokenExpiry = result.expiresAt;
+            await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, {
+                native: {
+                    client_secret: result.refreshToken,
+                    tokenExpiry: result.expiresAt,
+                },
+            });
+            await this.setStateAsync('info.tokenExpiry', result.expiresAt, true);
+            this.log.info(`New refresh token obtained, valid until ${result.expiresAt}`);
+        } catch (err) {
+            this.log.error(`Failed to fetch refresh token: ${err.message || err}`);
+        }
+    }
+
+    /**
+     * Handle sendTo messages from admin UI.
+     * @param {{ command: string, message: any, callback: function }} obj
+     */
+    async onMessage(obj) {
+        if (!obj || !obj.command) return;
+
+        if (obj.command === 'fetchToken') {
+            const { username, password, brand } = obj.message || {};
+            if (!username || !password || !brand) {
+                this.sendTo(obj.from, obj.command, { error: 'Username, password and brand are required' }, obj.callback);
+                return;
+            }
+            try {
+                const result = await tokenManager.fetchToken(brand, username, password);
+                this.config.client_secret = result.refreshToken;
+                this.config.tokenExpiry = result.expiresAt;
+                await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, {
+                    native: {
+                        client_secret: result.refreshToken,
+                        tokenExpiry: result.expiresAt,
+                    },
+                });
+                await this.setStateAsync('info.tokenExpiry', result.expiresAt, true);
+                this.sendTo(obj.from, obj.command, { result: `Token successfully fetched. Valid until ${result.expiresAt}` }, obj.callback);
+            } catch (err) {
+                this.sendTo(obj.from, obj.command, { error: `${err.message || err}` }, obj.callback);
             }
         }
     }

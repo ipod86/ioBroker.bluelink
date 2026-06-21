@@ -7,7 +7,6 @@
             "text": "bluelink adapter settings",
             "size": 2
         },
-
         "_documentationLink": {
             "type": "staticLink",
             "label": "Token-documentation",
@@ -129,6 +128,16 @@
             "lg": 3,
             "xl": 3
         },
+        "password": {
+            "type": "password",
+            "label": "Password",
+            "repeat": false,
+            "xs": 12,
+            "sm": 12,
+            "md": 4,
+            "lg": 3,
+            "xl": 3
+        },
         "client_secret_pin": {
             "type": "password",
             "label": "Pin",
@@ -148,6 +157,39 @@
             "md": 6,
             "lg": 5,
             "xl": 5
+        },
+        "tokenExpiry": {
+            "type": "text",
+            "label": "Token valid until (auto-managed)",
+            "disabled": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 6,
+            "lg": 5,
+            "xl": 5,
+            "newLine": true
+        },
+        "_fetchTokenBtn": {
+            "type": "sendTo",
+            "label": "Fetch / refresh token now",
+            "command": "fetchToken",
+            "data": {
+                "username": {
+                    "data": "username"
+                },
+                "password": {
+                    "data": "password"
+                },
+                "brand": {
+                    "data": "brand"
+                }
+            },
+            "result": "_fetchTokenResult",
+            "xs": 12,
+            "sm": 12,
+            "md": 4,
+            "lg": 3,
+            "xl": 3
         },
         "Api settings": {
             "type": "header",

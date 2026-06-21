@@ -165,13 +165,16 @@
     "client_secret_pin"
   ],
   "encryptedNative": [
+    "password",
     "client_secret",
     "client_secret_pin"
   ],
   "native": {
     "username": "",
+    "password": "",
     "client_secret": "",
     "client_secret_pin": "",
+    "tokenExpiry": "",
     "brand": "kia",
     "request": 100,
     "evHistory": true,
@@ -200,6 +203,19 @@
         "read": true,
         "write": false,
         "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.tokenExpiry",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "Refresh token expiry date",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": ""
       },
       "native": {}
     }
