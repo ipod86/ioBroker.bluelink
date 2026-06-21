@@ -345,35 +345,44 @@ class Bluelink extends utils.Adapter {
      * Handle sendTo messages from admin UI.
      * @param {{ command: string, message: any, callback: function }} obj
      */
-    async onMessage(obj) {
+    onMessage(obj) {
         if (!obj || !obj.command) return;
 
         if (obj.command === 'fetchToken') {
-            // Read credentials from adapter config (already saved/encrypted by ioBroker)
+            this.log.info('[fetchToken] Message received from admin UI');
+
+            // Always respond — if callback is never called the GUI stays grey forever
+            const respond = (payload) => {
+                if (obj.callback) {
+                    this.sendTo(obj.from, obj.command, payload, obj.callback);
+                }
+            };
+
             const username = this.config.username;
             const password = this.config.password;
             const brand    = this.config.brand;
 
-            this.log.info('[fetchToken] Button clicked via admin UI');
             this.log.info(`[fetchToken] brand=${brand} username=${username} password-set=${!!password}`);
 
             if (!username || !password || !brand) {
-                const msg = `Missing credentials: username=${!!username} password=${!!password} brand=${!!brand}. Save the settings first.`;
+                const msg = `Save settings first. Missing: ${[!username && 'username', !password && 'password', !brand && 'brand'].filter(Boolean).join(', ')}`;
                 this.log.error(`[fetchToken] ${msg}`);
-                this.sendTo(obj.from, obj.command, { error: msg }, obj.callback);
+                respond({ error: msg });
                 return;
             }
 
-            try {
-                const result = await tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg));
-                this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                await this.saveToken(result.refreshToken, result.expiresAt);
-                this.log.info('[fetchToken] Token saved to info.refreshToken and info.tokenExpiry states');
-                this.sendTo(obj.from, obj.command, { result: `Token successfully fetched. Valid until ${result.expiresAt}. Restart the adapter to apply.` }, obj.callback);
-            } catch (err) {
-                this.log.error(`[fetchToken] Failed: ${err.message || err}`);
-                this.sendTo(obj.from, obj.command, { error: `${err.message || err}` }, obj.callback);
-            }
+            // Run async fetch, always call respond regardless of outcome
+            tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg))
+                .then(async (result) => {
+                    this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
+                    await this.saveToken(result.refreshToken, result.expiresAt);
+                    this.log.info('[fetchToken] Token saved');
+                    respond({ result: `Token fetched successfully. Valid until ${result.expiresAt}. Restart the adapter to connect.` });
+                })
+                .catch((err) => {
+                    this.log.error(`[fetchToken] Failed: ${err.message || err}`);
+                    respond({ error: String(err.message || err) });
+                });
         }
     }
 
