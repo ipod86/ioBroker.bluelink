@@ -100,6 +100,7 @@ class Bluelink extends utils.Adapter {
         }
 
         if (loginGo) {
+            await this.ensureRefreshToken();
             await this.login();
         }
     }
@@ -282,6 +283,59 @@ class Bluelink extends utils.Adapter {
     }
 
     /**
+     * Encrypt token and persist it to the adapter's native config.
+     *
+     * @param refreshToken
+     * @param expiresAt
+     */
+    async saveTokenToConfig(refreshToken, expiresAt) {
+        const adapterObj = await this.getForeignObjectAsync(`system.adapter.${this.namespace}`);
+        if (!adapterObj) {
+return;
+}
+        adapterObj.native.refreshToken = this.encrypt(refreshToken);
+        adapterObj.native.tokenExpiry  = expiresAt;
+        await this.setForeignObjectAsync(`system.adapter.${this.namespace}`, adapterObj);
+        this.log.info(`[saveTokenToConfig] Token encrypted and saved, valid until ${expiresAt}`);
+    }
+
+    /** Auto-renew token if it expires within 14 days and password is configured. */
+    async ensureRefreshToken() {
+        const token  = this.config.refreshToken || this.config.client_secret || '';
+        const expiry = this.config.tokenExpiry || '';
+
+        if (!token) {
+return;
+} // no token yet — user must press Fetch button first
+
+        if (!expiry) {
+return;
+} // manually entered token with unknown expiry — skip
+
+        const daysLeft = Math.floor((new Date(expiry).getTime() - Date.now()) / 86400000);
+        this.log.info(`[ensureRefreshToken] Token valid for ${daysLeft} more days`);
+
+        if (daysLeft > 14) {
+return;
+} // plenty of time left
+
+        if (!this.config.password || !this.config.username) {
+            this.log.warn(`[ensureRefreshToken] Token expires in ${daysLeft} days but no password set for auto-renewal`);
+            return;
+        }
+
+        this.log.info(`[ensureRefreshToken] Token expires in ${daysLeft} days — auto-renewing now`);
+        try {
+            const result = await tokenManager.fetchToken(
+                this.config.brand, this.config.username, this.config.password, msg => this.log.info(msg)
+            );
+            await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
+            // ioBroker restarts the adapter automatically after a config change
+        } catch (err) {
+            this.log.error(`[ensureRefreshToken] Auto-renewal failed: ${err.message || err}`);
+        }
+    }
+
     /**
      * Handle sendTo messages from admin UI.
      *
@@ -319,13 +373,7 @@ return;
             tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg))
                 .then(async (result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                    // Encrypt and write token directly into native config (no manual Save needed)
-                    const adapterObj = await this.getForeignObjectAsync(`system.adapter.${this.namespace}`);
-                    if (adapterObj) {
-                        adapterObj.native.refreshToken = this.encrypt(result.refreshToken);
-                        await this.setForeignObjectAsync(`system.adapter.${this.namespace}`, adapterObj);
-                        this.log.info('[fetchToken] Token encrypted and saved to adapter config');
-                    }
+                    await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
                     respond(`Token saved. Valid until ${result.expiresAt}. Restart the adapter to connect.`);
                 })
                 .catch((err) => {
