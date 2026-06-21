@@ -18,5 +18,7 @@
     "Token-documentation": "Documentación del token",
     "Password": "Contraseña (contraseña de cuenta)",
     "Token valid until (auto-managed)": "Token de actualización válido hasta (gestionado automáticamente)",
-    "Fetch / refresh token now": "Obtener / actualizar token ahora"
+    "Fetch / refresh token now": "Obtener / actualizar token ahora",
+    "fetchTokenHelp": "Rellenado por el botón. Reinicie el adaptador después.",
+    "fetchTokenHint": "Después de obtener: reinicie el adaptador."
 }

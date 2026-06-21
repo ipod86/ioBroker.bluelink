@@ -19,5 +19,7 @@
     "Token-documentation": "Token-Dokumentation",
     "Password": "Passwort (Konto-Passwort)",
     "Token valid until (auto-managed)": "Refresh-Token gültig bis (automatisch verwaltet)",
-    "Fetch / refresh token now": "Token jetzt holen / erneuern"
+    "Fetch / refresh token now": "Token jetzt holen / erneuern",
+    "fetchTokenHelp": "Wird automatisch vom Button befüllt. Adapter nach dem Abruf neu starten.",
+    "fetchTokenHint": "Nach dem Abrufen: Adapter neu starten, um die Verbindung aufzubauen."
 }

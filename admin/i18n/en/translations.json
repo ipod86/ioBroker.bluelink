@@ -19,5 +19,7 @@
     "Token-documentation": "Token documentation",
     "Password": "Password (account password)",
     "Token valid until (auto-managed)": "Refresh token valid until (auto-managed)",
-    "Fetch / refresh token now": "Fetch / refresh token now"
+    "Fetch / refresh token now": "Fetch / refresh token now",
+    "fetchTokenHelp": "Auto-filled by the Fetch button. Restart adapter after fetching.",
+    "fetchTokenHint": "After fetching: restart the adapter to connect."
 }

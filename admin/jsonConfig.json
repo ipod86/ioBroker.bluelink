@@ -155,7 +155,9 @@
             "sm": 12,
             "md": 6,
             "lg": 5,
-            "xl": 5
+            "xl": 5,
+            "disabled": true,
+            "help": "fetchTokenHelp"
         },
         "client_secret": {
             "newLine": true,
@@ -185,7 +187,6 @@
             "label": "Fetch / refresh token now",
             "command": "fetchToken",
             "data": {},
-            "result": "refreshToken",
             "xs": 12,
             "sm": 12,
             "md": 4,
@@ -194,7 +195,7 @@
         },
         "_fetchTokenStatus": {
             "type": "staticText",
-            "text": "After fetching: click Save to store the token permanently.",
+            "text": "fetchTokenHint",
             "newLine": true,
             "xs": 12
         },

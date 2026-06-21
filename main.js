@@ -315,11 +315,18 @@ return;
                 return;
             }
 
-            // Run async fetch, always call respond regardless of outcome
+            // Fetch token, save directly to adapter native config, then respond
             tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg))
-                .then((result) => {
+                .then(async (result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                    respond(result.refreshToken);
+                    // Write token directly into native config so no manual Save is needed
+                    const adapterObj = await this.getForeignObjectAsync(`system.adapter.${this.namespace}`);
+                    if (adapterObj) {
+                        adapterObj.native.refreshToken = result.refreshToken;
+                        await this.setForeignObjectAsync(`system.adapter.${this.namespace}`, adapterObj);
+                        this.log.info('[fetchToken] Token saved to adapter config');
+                    }
+                    respond(`Token saved. Valid until ${result.expiresAt}. Restart the adapter to connect.`);
                 })
                 .catch((err) => {
                     this.log.error(`[fetchToken] Failed: ${err.message || err}`);

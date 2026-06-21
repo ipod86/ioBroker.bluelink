@@ -18,5 +18,7 @@
     "Token-documentation": "Tokendocumentatie",
     "Password": "Wachtwoord (accountwachtwoord)",
     "Token valid until (auto-managed)": "Vernieuwingstoken geldig tot (automatisch beheerd)",
-    "Fetch / refresh token now": "Token nu ophalen / vernieuwen"
+    "Fetch / refresh token now": "Token nu ophalen / vernieuwen",
+    "fetchTokenHelp": "Ingevuld door de knop. Start adapter opnieuw na ophalen.",
+    "fetchTokenHint": "Na ophalen: herstart de adapter."
 }
