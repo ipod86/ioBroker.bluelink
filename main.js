@@ -390,7 +390,7 @@ return;
             if (!username || !password || !brand) {
                 const msg = `Save settings first. Missing: ${[!username && 'username', !password && 'password', !brand && 'brand'].filter(Boolean).join(', ')}`;
                 this.log.error(`[fetchToken] ${msg}`);
-                respond({ error: msg });
+                respond(`ERROR: ${msg}`);
                 return;
             }
 
@@ -400,11 +400,11 @@ return;
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
                     await this.saveToken(result.refreshToken, result.expiresAt);
                     this.log.info('[fetchToken] Token saved');
-                    respond({ result: result.refreshToken });
+                    respond(result.refreshToken);
                 })
                 .catch((err) => {
                     this.log.error(`[fetchToken] Failed: ${err.message || err}`);
-                    respond({ error: String(err.message || err) });
+                    respond(`ERROR: ${err.message || err}`);
                 });
         }
     }
