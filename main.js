@@ -72,6 +72,7 @@ class Bluelink extends utils.Adapter {
         this.countError = 0;
         this.slow_charging = 100;
         this.fast_charging = 100;
+        this._renewalAttempted = false;
     }
 
     async onReady() {
@@ -299,41 +300,42 @@ return;
         this.log.info(`[saveTokenToConfig] Token encrypted and saved, valid until ${expiresAt}`);
     }
 
-    /** Auto-renew token if it expires within 14 days and password is configured. */
+    /**
+     * Attempt one token renewal. Returns true if a new token was saved (adapter will restart).
+     * Never throws — logs errors internally.
+     */
+    async tryRenewToken() {
+        if (!this.config.password || !this.config.username) {
+return false;
+}
+        try {
+            const result = await tokenManager.fetchToken(
+                this.config.brand, this.config.username, this.config.password
+            );
+            await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
+            return true;
+        } catch (err) {
+            this.log.error(`Token auto-renewal failed: ${err.message || err}`);
+            return false;
+        }
+    }
+
+    /** On adapter start: renew token if it expires within 14 days. */
     async ensureRefreshToken() {
         const token  = this.config.refreshToken || this.config.client_secret || '';
         const expiry = this.config.tokenExpiry || '';
-
-        if (!token) {
+        if (!token || !expiry) {
 return;
-} // no token yet — user must press Fetch button first
-
-        if (!expiry) {
-return;
-} // manually entered token with unknown expiry — skip
-
+}
         const daysLeft = Math.floor((new Date(expiry).getTime() - Date.now()) / 86400000);
-        this.log.info(`[ensureRefreshToken] Token valid for ${daysLeft} more days`);
-
         if (daysLeft > 14) {
 return;
-} // plenty of time left
-
+}
         if (!this.config.password || !this.config.username) {
-            this.log.warn(`[ensureRefreshToken] Token expires in ${daysLeft} days but no password set for auto-renewal`);
+            this.log.warn(`Token expires in ${daysLeft} days — set password for auto-renewal`);
             return;
         }
-
-        this.log.info(`[ensureRefreshToken] Token expires in ${daysLeft} days — auto-renewing now`);
-        try {
-            const result = await tokenManager.fetchToken(
-                this.config.brand, this.config.username, this.config.password, msg => this.log.info(msg)
-            );
-            await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
-            // ioBroker restarts the adapter automatically after a config change
-        } catch (err) {
-            this.log.error(`[ensureRefreshToken] Auto-renewal failed: ${err.message || err}`);
-        }
+        await this.tryRenewToken();
     }
 
     /**
@@ -452,15 +454,23 @@ return;
             });
 
             blueLinkyClient.on('error', async (err) => {
-                // something went wrong with login
                 this.log.error(err);
                 this.log.error('Server is not available or login credentials are wrong');
-                this.log.error('next auto login attempt in 1 hour or restart adapter manual');
 
+                // One-shot token renewal on login failure (no loop: flag prevents second attempt)
+                if (!this._renewalAttempted && this.config.password) {
+                    this._renewalAttempted = true;
+                    const renewed = await this.tryRenewToken();
+                    if (renewed) {
+return;
+} // adapter restarts automatically with new token
+                }
+
+                this.log.error('next auto login attempt in 1 hour or restart adapter manual');
                 adapterIntervals.loginRetryTimeout = setTimeout(async () => {
                     blueLinkyClient.removeAllListeners();
                     await this.login();
-                }, 1000 * 60 * 60);  // warte 1 stunde
+                }, 1000 * 60 * 60);
             });
         } catch (error) {
             this.log.error('Error in login/on function');
