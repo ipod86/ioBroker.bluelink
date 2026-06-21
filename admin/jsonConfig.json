@@ -173,17 +173,7 @@
             "type": "sendTo",
             "label": "Fetch / refresh token now",
             "command": "fetchToken",
-            "data": {
-                "username": {
-                    "data": "username"
-                },
-                "password": {
-                    "data": "password"
-                },
-                "brand": {
-                    "data": "brand"
-                }
-            },
+            "data": {},
             "result": "_fetchTokenResult",
             "xs": 12,
             "sm": 12,

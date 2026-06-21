@@ -305,7 +305,7 @@ class Bluelink extends utils.Adapter {
 
         this.log.info(`${hasToken ? 'Refresh token expires soon – fetching new one' : 'No refresh token – fetching from Hyundai/Kia'}`);
         try {
-            const result = await tokenManager.fetchToken(this.config.brand, this.config.username, this.config.password);
+            const result = await tokenManager.fetchToken(this.config.brand, this.config.username, this.config.password, msg => this.log.info(msg));
             this.config.client_secret = result.refreshToken;
             this.config.tokenExpiry = result.expiresAt;
             await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, {
@@ -329,24 +329,41 @@ class Bluelink extends utils.Adapter {
         if (!obj || !obj.command) return;
 
         if (obj.command === 'fetchToken') {
-            const { username, password, brand } = obj.message || {};
+            // Read credentials from adapter config (already saved/encrypted by ioBroker)
+            const username = this.config.username;
+            const password = this.config.password;
+            const brand    = this.config.brand;
+
+            this.log.info('[fetchToken] Button clicked via admin UI');
+            this.log.info(`[fetchToken] brand=${brand} username=${username} password-set=${!!password}`);
+
             if (!username || !password || !brand) {
-                this.sendTo(obj.from, obj.command, { error: 'Username, password and brand are required' }, obj.callback);
+                const msg = `Missing credentials: username=${!!username} password=${!!password} brand=${!!brand}. Save the settings first.`;
+                this.log.error(`[fetchToken] ${msg}`);
+                this.sendTo(obj.from, obj.command, { error: msg }, obj.callback);
                 return;
             }
+
             try {
-                const result = await tokenManager.fetchToken(brand, username, password);
+                const result = await tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg));
+
+                this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
+
                 this.config.client_secret = result.refreshToken;
-                this.config.tokenExpiry = result.expiresAt;
+                this.config.tokenExpiry   = result.expiresAt;
+
                 await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, {
                     native: {
                         client_secret: result.refreshToken,
-                        tokenExpiry: result.expiresAt,
+                        tokenExpiry:   result.expiresAt,
                     },
                 });
                 await this.setStateAsync('info.tokenExpiry', result.expiresAt, true);
+                this.log.info('[fetchToken] Token saved to config and info.tokenExpiry state');
+
                 this.sendTo(obj.from, obj.command, { result: `Token successfully fetched. Valid until ${result.expiresAt}` }, obj.callback);
             } catch (err) {
+                this.log.error(`[fetchToken] Failed: ${err.message || err}`);
                 this.sendTo(obj.from, obj.command, { error: `${err.message || err}` }, obj.callback);
             }
         }
