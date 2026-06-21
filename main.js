@@ -295,10 +295,12 @@ class Bluelink extends utils.Adapter {
         try {
             const tokenState  = await this.getStateAsync('info.refreshToken');
             const expiryState = await this.getStateAsync('info.tokenExpiry');
-            if (tokenState && tokenState.val) {
+            // A real refresh token is 100+ characters; ignore suspiciously short values
+            if (tokenState && tokenState.val && String(tokenState.val).length >= 100) {
                 return { token: tokenState.val, expiry: expiryState ? expiryState.val : '' };
             }
         } catch (_) { /* state might not exist yet */ }
+        // Fall back to manually entered token in config
         return { token: this.config.client_secret || '', expiry: '' };
     }
 

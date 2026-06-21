@@ -139,6 +139,7 @@
     },
     "platform": "Javascript/Node.js",
     "icon": "bluelink.png",
+    "messagebox": true,
     "enabled": true,
     "extIcon": "https://raw.githubusercontent.com/Newan/ioBroker.bluelink/master/admin/bluelink.png",
     "readme": "https://github.com/Newan/ioBroker.bluelink/blob/master/README.md",
