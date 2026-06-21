@@ -18,16 +18,14 @@ Adapter to control Hyundai or Kia vehicle (until 2023)
 
 [Discussion](https://forum.iobroker.net/topic/43592/adapter-hyundai-bluelink-oder-kia-uvo)
 
-[Login Infos](https://developers.kia.com/web/v1/kia/specification/account/account_authorize)
-
-[Token generieren](https://github.com/Newan/ioBroker.bluelink/tree/master/py) or [workaround with Token](https://forum.iobroker.net/topic/43592/adapter-hyundai-bluelink-oder-kia-uvo/2249?_=1761189451343)
-
 [Wiki](https://github.com/Newan/ioBroker.bluelink/wiki)
 
 ------------------------------------------------------------------------------------
 ## Changelog
 ### **WORK IN PROGRESS**
 - (copilot) Adapter requires node.js >= 22 now
+- (ipod86) built-in OAuth token fetch for Hyundai/Kia EU — enter email, password and PIN in the adapter settings; the adapter fetches and renews the token automatically
+- (ipod86) fix GPS coordinates in position states
 
 ### 3.1.28 (2026-04-08)
 * (arteck) Dependencies have been updated
