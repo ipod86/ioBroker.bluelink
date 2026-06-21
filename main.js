@@ -2,6 +2,8 @@
 
 const utils = require('@iobroker/adapter-core');
 const { BlueLinky } = require('bluelinky');
+const fs = require('fs');
+const path = require('path');
 
 const Json2iob = require('./lib/json2iob');
 const tools = require('./lib/tools');
@@ -286,30 +288,38 @@ class Bluelink extends utils.Adapter {
      * Fetch a new refresh token if none is stored or it expires within 14 days.
      * Requires this.config.password (actual account password) to be set.
      */
+    /** Path to the token cache file in ioBroker's data directory. */
+    _tokenFilePath() {
+        const dataDir = utils.getAbsoluteDefaultDataDir
+            ? utils.getAbsoluteDefaultDataDir()
+            : path.join(__dirname, '..', '..', 'iobroker-data');
+        return path.join(dataDir, `bluelink.${this.instance}.token.json`);
+    }
+
     /**
-     * Read the active refresh token: prefer auto-fetched token from state,
+     * Read the active refresh token: prefer auto-fetched token from file,
      * fall back to manually entered token from config (client_secret).
      * @returns {{ token: string, expiry: string }}
      */
     async getStoredToken() {
         try {
-            const tokenState  = await this.getStateAsync('info.refreshToken');
-            const expiryState = await this.getStateAsync('info.tokenExpiry');
-            // A real refresh token is 100+ characters; ignore suspiciously short values
-            if (tokenState && tokenState.val && String(tokenState.val).length >= 100) {
-                return { token: tokenState.val, expiry: expiryState ? expiryState.val : '' };
+            const raw  = fs.readFileSync(this._tokenFilePath(), 'utf-8');
+            const data = JSON.parse(raw);
+            if (data && data.token && String(data.token).length >= 100) {
+                return { token: data.token, expiry: data.expiry || '' };
             }
-        } catch (_) { /* state might not exist yet */ }
-        // Fall back to manually entered token in config
+        } catch (_) { /* file doesn't exist yet or unreadable */ }
         return { token: this.config.client_secret || '', expiry: '' };
     }
 
-    /** Persist auto-fetched token to states (no encrypted-native involved). */
+    /** Persist auto-fetched token to a local JSON file. */
     async saveToken(refreshToken, expiresAt) {
-        await this.setStateAsync('info.refreshToken', refreshToken, true);
-        await this.setStateAsync('info.tokenExpiry',  expiresAt,    true);
+        const filePath = this._tokenFilePath();
+        fs.writeFileSync(filePath, JSON.stringify({ token: refreshToken, expiry: expiresAt }), 'utf-8');
+        await this.setStateAsync('info.tokenExpiry', expiresAt, true);
         this._activeRefreshToken = refreshToken;
         this._activeTokenExpiry  = expiresAt;
+        this.log.info(`[saveToken] Written to ${filePath} (tokenLen=${refreshToken.length})`);
     }
 
     async ensureRefreshToken() {
