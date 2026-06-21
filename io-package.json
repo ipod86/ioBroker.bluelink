@@ -162,11 +162,13 @@
     ]
   },
   "protectedNative": [
+    "refreshToken",
     "client_secret",
     "client_secret_pin"
   ],
   "encryptedNative": [
     "password",
+    "refreshToken",
     "client_secret",
     "client_secret_pin"
   ],

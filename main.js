@@ -319,12 +319,12 @@ return;
             tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg))
                 .then(async (result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                    // Write token directly into native config so no manual Save is needed
+                    // Encrypt and write token directly into native config (no manual Save needed)
                     const adapterObj = await this.getForeignObjectAsync(`system.adapter.${this.namespace}`);
                     if (adapterObj) {
-                        adapterObj.native.refreshToken = result.refreshToken;
+                        adapterObj.native.refreshToken = this.encrypt(result.refreshToken);
                         await this.setForeignObjectAsync(`system.adapter.${this.namespace}`, adapterObj);
-                        this.log.info('[fetchToken] Token saved to adapter config');
+                        this.log.info('[fetchToken] Token encrypted and saved to adapter config');
                     }
                     respond(`Token saved. Valid until ${result.expiresAt}. Restart the adapter to connect.`);
                 })
