@@ -7,21 +7,6 @@
             "text": "bluelink adapter settings",
             "size": 2
         },
-        "_documentationLink": {
-            "type": "staticLink",
-            "label": "Token-documentation",
-            "button": true,
-            "href": "https://github.com/Newan/ioBroker.bluelink/tree/master/py",
-            "xs": 12,
-            "sm": 12,
-            "md": 6,
-            "lg": 4,
-            "xl": 4,
-            "style": {
-                "fontSize": 18,
-                "marginTop": 0
-            }
-        },
         "Account settings": {
             "type": "header",
             "text": "Account settings",
