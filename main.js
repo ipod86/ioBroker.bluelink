@@ -368,7 +368,7 @@ return;
             if (!username || !password || !brand) {
                 const msg = `Save settings first. Missing: ${[!username && 'username', !password && 'password', !brand && 'brand'].filter(Boolean).join(', ')}`;
                 this.log.error(`[fetchToken] ${msg}`);
-                respond(`ERROR: ${msg}`);
+                respond({ _fetchTokenResult: `FEHLER: ${msg}` });
                 return;
             }
 
@@ -377,11 +377,11 @@ return;
                 .then(async (result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
                     await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
-                    respond(`Token saved. Valid until ${result.expiresAt}. Restart the adapter to connect.`);
+                    respond({ _fetchTokenResult: `Token gespeichert. Gültig bis ${result.expiresAt}. Adapter neu starten.` });
                 })
                 .catch((err) => {
                     this.log.error(`[fetchToken] Failed: ${err.message || err}`);
-                    respond(`ERROR: ${err.message || err}`);
+                    respond({ _fetchTokenResult: `FEHLER: ${err.message || err}` });
                 });
         }
     }

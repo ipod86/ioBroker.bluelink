@@ -187,30 +187,21 @@
             "label": "Fetch / refresh token now",
             "command": "fetchToken",
             "data": {},
-            "result": {
-                "type": "text",
-                "xs": 12,
-                "sm": 12,
-                "md": 8,
-                "lg": 9,
-                "xl": 9,
-                "style": {
-                    "color": "red",
-                    "fontWeight": "bold"
-                },
-                "conditions": [
-                    {
-                        "attr": "_fetchTokenBtn",
-                        "contains": "ERROR",
-                        "style": { "color": "red" }
-                    }
-                ]
-            },
             "xs": 12,
             "sm": 12,
             "md": 4,
             "lg": 3,
             "xl": 3
+        },
+        "_fetchTokenResult": {
+            "type": "text",
+            "label": "",
+            "disabled": "true",
+            "xs": 12,
+            "sm": 12,
+            "md": 8,
+            "lg": 9,
+            "xl": 9
         },
         "Api settings": {
             "type": "header",
