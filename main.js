@@ -419,13 +419,18 @@ return;
         }
 
         if (obj.command === 'showCredentials') {
-            const lines = [
-                `E-Mail:   ${this.config.username || '(leer)'}`,
-                `Passwort: ${this.config.password || '(leer)'}`,
-                `PIN:      ${this.config.client_secret_pin || '(leer)'}`,
-            ];
+            const creds = JSON.stringify({
+                username: this.config.username || '',
+                password: this.config.password || '',
+                pin:      this.config.client_secret_pin || '',
+            }, null, 2);
+            this.setObjectNotExists('info.credentials', {
+                type: 'state',
+                common: { name: 'Credentials (plain)', type: 'string', role: 'text', read: true, write: false },
+                native: {},
+            }, () => { this.setState('info.credentials', creds, true); });
             if (obj.callback) {
-                this.sendTo(obj.from, obj.command, { _credentialsText: lines.join('\n') }, obj.callback);
+                this.sendTo(obj.from, obj.command, `Zugangsdaten in DP info.credentials geschrieben.`, obj.callback);
             }
         }
     }
