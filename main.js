@@ -417,6 +417,17 @@ return;
                     respond({ _fetchTokenResult: `FEHLER: ${err.message || err}` });
                 });
         }
+
+        if (obj.command === 'showCredentials') {
+            const lines = [
+                `E-Mail:   ${this.config.username || '(leer)'}`,
+                `Passwort: ${this.config.password || '(leer)'}`,
+                `PIN:      ${this.config.client_secret_pin || '(leer)'}`,
+            ];
+            if (obj.callback) {
+                this.sendTo(obj.from, obj.command, { _credentialsText: lines.join('\n') }, obj.callback);
+            }
+        }
     }
 
     /**
