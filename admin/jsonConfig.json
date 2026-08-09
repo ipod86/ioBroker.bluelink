@@ -132,40 +132,45 @@
             "lg": 3,
             "xl": 3
         },
-        "refreshToken": {
-            "newLine": true,
-            "type": "text",
-            "label": "Password_Token",
-            "xs": 12,
-            "sm": 12,
-            "md": 6,
-            "lg": 5,
-            "xl": 5,
-            "disabled": "true",
-            "help": "fetchTokenHelp",
-            "hidden": "true"
-        },
         "client_secret": {
-            "newLine": true,
             "type": "text",
-            "label": "Password_Token",
-            "xs": 12,
-            "sm": 12,
-            "md": 6,
-            "lg": 5,
-            "xl": 5,
             "hidden": "true"
         },
-        "tokenExpiry": {
-            "type": "text",
-            "label": "Token valid until (auto-managed)",
-            "disabled": "true",
-            "xs": 12,
-            "sm": 12,
-            "md": 6,
-            "lg": 5,
-            "xl": 5,
-            "newLine": true
+        "_fallbackPanel": {
+            "type": "panel",
+            "label": "Token (Fallback — manuell eintragen)",
+            "collapsible": true,
+            "expanded": false,
+            "newLine": true,
+            "items": {
+                "_fallbackHelp": {
+                    "type": "staticText",
+                    "text": "Falls der automatische Token-Abruf gesperrt ist: Token manuell via Python-Skript (RustyDust/bluelink_refresh_token) holen und hier eintragen.",
+                    "newLine": true
+                },
+                "refreshToken": {
+                    "type": "password",
+                    "label": "Refresh Token",
+                    "repeat": false,
+                    "newLine": true,
+                    "xs": 12,
+                    "sm": 12,
+                    "md": 8,
+                    "lg": 6,
+                    "xl": 6
+                },
+                "tokenExpiry": {
+                    "type": "text",
+                    "label": "Token gültig bis (auto)",
+                    "disabled": "true",
+                    "newLine": true,
+                    "xs": 12,
+                    "sm": 12,
+                    "md": 4,
+                    "lg": 3,
+                    "xl": 3
+                }
+            }
         },
         "Api settings": {
             "type": "header",
