@@ -101,6 +101,20 @@ class Bluelink extends utils.Adapter {
             loginGo = false;
         }
 
+        await this.setObjectNotExistsAsync('info.fetchToken', {
+            type: 'state',
+            common: {
+                name: 'Fetch / refresh token manually',
+                type: 'boolean',
+                role: 'button',
+                read: true,
+                write: true,
+                def: false,
+            },
+            native: {},
+        });
+        this.subscribeStates('info.fetchToken');
+
         if (loginGo) {
             await this.ensureRefreshToken();
             await this.login();
@@ -131,6 +145,19 @@ class Bluelink extends utils.Adapter {
 
     async onStateChange(id, state) {
         if (state) {
+            // Manual token fetch trigger: write true to info.fetchToken
+            if (id.endsWith('.info.fetchToken') && state.val === true && !state.ack) {
+                this.setState('info.fetchToken', false, true);
+                this.log.info('[fetchToken] Triggered via state info.fetchToken');
+                const ok = await this.tryRenewToken();
+                if (ok) {
+                    this.log.info('[fetchToken] Token fetched and saved — adapter restarting');
+                } else {
+                    this.log.error('[fetchToken] Failed — check log for details');
+                }
+                return;
+            }
+
             if (id.indexOf('.control.') === -1) {
                 return;
             }
@@ -321,13 +348,19 @@ return false;
         }
     }
 
-    /** On adapter start: renew token if it expires within 14 days. */
+    /** On adapter start: fetch token if missing, or renew if it expires within 14 days. */
     async ensureRefreshToken() {
         const token  = this.config.refreshToken || this.config.client_secret || '';
         const expiry = this.config.tokenExpiry || '';
-        if (!token || !expiry) {
-return;
-}
+
+        if (!token) {
+            if (this.config.username && this.config.password) {
+                this.log.info('[ensureRefreshToken] No token found — fetching automatically');
+                await this.tryRenewToken();
+            }
+            return;
+        }
+
         const daysLeft = Math.floor((new Date(expiry).getTime() - Date.now()) / 86400000);
         if (daysLeft > 14) {
 return;
