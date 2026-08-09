@@ -145,8 +145,20 @@
             "items": {
                 "_fallbackHelp": {
                     "type": "staticText",
-                    "text": "Falls der automatische Token-Abruf gesperrt ist: Token manuell via Python-Skript (RustyDust/bluelink_refresh_token) holen und hier eintragen.",
+                    "text": "Falls der automatische Token-Abruf gesperrt ist: Token manuell via Python-Skript holen und hier eintragen.",
                     "newLine": true
+                },
+                "_fallbackDocLink": {
+                    "type": "staticLink",
+                    "label": "Anleitung: bluelink_refresh_token",
+                    "button": true,
+                    "href": "https://github.com/RustyDust/bluelink_refresh_token",
+                    "newLine": true,
+                    "xs": 12,
+                    "sm": 12,
+                    "md": 6,
+                    "lg": 4,
+                    "xl": 4
                 },
                 "refreshToken": {
                     "type": "password",
