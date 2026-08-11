@@ -338,7 +338,8 @@ return false;
 }
         try {
             const result = await tokenManager.fetchToken(
-                this.config.brand, this.config.username, this.config.password
+                this.config.brand, this.config.username, this.config.password,
+                msg => this.log.info(msg),
             );
             await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
             return true;
