@@ -429,7 +429,7 @@ return;
                 .then(async (result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
                     await this.saveTokenToConfig(result.refreshToken, result.expiresAt, { cci: result.cci });
-                    respond({ _fetchTokenResult: `Token gespeichert. Gültig bis ${result.expiresAt}. Adapter neu starten.` });
+                    respond({ _fetchTokenResult: `Token gespeichert (gültig bis ${result.expiresAt}). Adapter startet automatisch neu.` });
                 })
                 .catch((err) => {
                     this.log.error(`[fetchToken] Failed: ${err.message || err}`);

@@ -187,14 +187,14 @@
         },
         "_fallbackPanel": {
             "type": "panel",
-            "label": "Manueller Fallback (nur falls der Button oben fehlschlägt)",
+            "label": "Falls der Button oben nicht funktioniert",
             "collapsible": true,
             "expanded": false,
             "newLine": true,
             "items": {
                 "_fallbackHelp": {
                     "type": "staticText",
-                    "text": "Falls der automatische Token-Abruf oben dauerhaft fehlschlägt: Token manuell via Python-Skript holen und in das Refresh-Token-Feld oben eintragen.",
+                    "text": "Token manuell via Python-Skript holen und in das Refresh-Token-Feld oben eintragen.",
                     "newLine": true
                 },
                 "_fallbackDocLink": {
