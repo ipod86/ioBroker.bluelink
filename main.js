@@ -74,6 +74,7 @@ class Bluelink extends utils.Adapter {
         this.fast_charging = 100;
         this._renewalAttempted = false;
         this._lastTokenCheck = 0;
+        this._cciTokenSet = null; // in-memory only - see prepareCciSession()
     }
 
     async onReady() {
@@ -118,13 +119,15 @@ class Bluelink extends utils.Adapter {
         if (loginGo) {
             await this.ensureRefreshToken();
             await this.login();
+        } else {
+            this.terminate('Invalid configuration: Username or engine type missing', 11);
         }
     }
 
     /**
      * Is called when adapter shuts down - callback has to be called under any circumstances!
      *
-     * @param {() => void} callback
+     * @param {() => void} callback Is called when adapter shuts down
      */
     onUnload(callback) {
         try {
@@ -138,7 +141,7 @@ class Bluelink extends utils.Adapter {
             }
             this.log.info('Adapter bluelink cleaned up everything...');
             callback();
-        } catch (e) {
+        } catch {
             callback();
         }
     }
@@ -233,7 +236,7 @@ class Bluelink extends utils.Adapter {
                             });
                             this.log.debug(JSON.stringify(response));
                         } catch (err) {
-                            this.log.error(err);
+                            this.log.error(err instanceof Error ? err.message : String(err));
                         }
                         break;
                     case 'stop':
@@ -259,6 +262,12 @@ class Bluelink extends utils.Adapter {
                         } else {
                             this.log.info(`Update method for ${vin} changed to "from the server"`);
                         }
+                        break;
+                    case 'force_location':
+                    case 'force_refresh_location':
+                        this.log.info(`Forcing vehicle location update for ${vin}`);
+                        await this.forceVehicleLocation(vehicle, vin);
+                        await this.setStateAsync(id, { val: true, ack: true });
                         break;
                     case 'force_login':
                         clearTimeout(adapterIntervals.readAllStates);
@@ -288,14 +297,14 @@ class Bluelink extends utils.Adapter {
                                 if (tmpControl == 'charge_limit_fast') {
                                     this.log.info('Set new charging options charge_limit_fast');
                                     const charge_limit_slow = await this.getStateAsync(`${vin}.control.charge_limit_slow`);
-                                    charge_option.fast = state.val;
-                                    charge_option.slow = charge_limit_slow ? charge_limit_slow.val : this.slow_charging;
+                                    charge_option.fast = Number(state.val);
+                                    charge_option.slow = (charge_limit_slow && charge_limit_slow.val != null) ? Number(charge_limit_slow.val) : this.slow_charging;
                                 }
                                 if (tmpControl == 'charge_limit_slow') {
                                     this.log.info('Set new charging options charge_limit_slow');
                                     const charge_limit_fast = await this.getStateAsync(`${vin}.control.charge_limit_fast`);
-                                    charge_option.slow = state.val;
-                                    charge_option.fast = charge_limit_fast ? charge_limit_fast.val : this.fast_charging;
+                                    charge_option.slow = Number(state.val);
+                                    charge_option.fast = (charge_limit_fast && charge_limit_fast.val != null) ? Number(charge_limit_fast.val) : this.fast_charging;
                                 }
                                 response = await vehicle.setChargeTargets(charge_option);
                                 this.log.debug(JSON.stringify(response));
@@ -313,17 +322,26 @@ class Bluelink extends utils.Adapter {
 
     /**
      * Encrypt token and persist it to the adapter's native config.
+     * Writing native config makes js-controller restart this instance.
      *
-     * @param refreshToken
-     * @param expiresAt
+     * @param {string} refreshToken Refresh token to encrypt and persist
+     * @param {string} expiresAt Token expiration date string
+     * @param {{cci?: object}} [extra] CCI token set (see tokenManager.fetchTokenCci) when the
+     *                                 token was obtained via the OneApp/CCI flow; omitted for
+     *                                 the legacy flow.
      */
-    async saveTokenToConfig(refreshToken, expiresAt) {
+    async saveTokenToConfig(refreshToken, expiresAt, extra = {}) {
         const adapterObj = await this.getForeignObjectAsync(`system.adapter.${this.namespace}`);
         if (!adapterObj) {
 return;
 }
         adapterObj.native.refreshToken = this.encrypt(refreshToken);
         adapterObj.native.tokenExpiry  = expiresAt;
+        adapterObj.native.tokenType = extra.cci ? 'cci' : 'legacy';
+        adapterObj.native.lastTokenSaveAt = Date.now();
+        if (extra.cci) {
+            adapterObj.native.cciTokenSet = this.encrypt(JSON.stringify(extra.cci));
+        }
         await this.setForeignObjectAsync(`system.adapter.${this.namespace}`, adapterObj);
         this.log.info(`[saveTokenToConfig] Token encrypted and saved, valid until ${expiresAt}`);
     }
@@ -339,12 +357,12 @@ return false;
         try {
             const result = await tokenManager.fetchToken(
                 this.config.brand, this.config.username, this.config.password,
-                msg => this.log.info(msg),
+                msg => this.log.debug(msg),
             );
-            await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
+            await this.saveTokenToConfig(result.refreshToken, result.expiresAt, { cci: result.cci });
             return true;
         } catch (err) {
-            this.log.error(`Token auto-renewal failed: ${err.message || err}`);
+            this.log.error(`Token auto-renewal failed: ${err instanceof Error ? err.message : String(err)}`);
             return false;
         }
     }
@@ -376,7 +394,7 @@ return;
     /**
      * Handle sendTo messages from admin UI.
      *
-     * @param {{command: string, message: any, callback: Function}} obj
+     * @param {ioBroker.Message} obj Message object received from admin UI
      */
     onMessage(obj) {
         if (!obj || !obj.command) {
@@ -407,10 +425,10 @@ return;
             }
 
             // Fetch token, save directly to adapter native config, then respond
-            tokenManager.fetchToken(brand, username, password, msg => this.log.info(msg))
+            tokenManager.fetchToken(brand, username, password, msg => this.log.debug(msg))
                 .then(async (result) => {
                     this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                    await this.saveTokenToConfig(result.refreshToken, result.expiresAt);
+                    await this.saveTokenToConfig(result.refreshToken, result.expiresAt, { cci: result.cci });
                     respond({ _fetchTokenResult: `Token gespeichert. Gültig bis ${result.expiresAt}. Adapter neu starten.` });
                 })
                 .catch((err) => {
@@ -429,7 +447,9 @@ return;
                 type: 'state',
                 common: { name: 'Credentials (plain)', type: 'string', role: 'text', read: true, write: false },
                 native: {},
-            }, () => { this.setState('info.credentials', creds, true); });
+            }, () => {
+ this.setState('info.credentials', creds, true); 
+});
             if (obj.callback) {
                 this.sendTo(obj.from, obj.command, `Zugangsdaten in DP info.credentials geschrieben.`, obj.callback);
             }
@@ -441,21 +461,63 @@ return;
      */
     async login() {
         try {
-            const activeToken = this.config.refreshToken || this.config.client_secret || '';
-            this.log.info(`Login to api – token source: ${this.config.refreshToken ? 'refreshToken' : 'client_secret(legacy)'}, tokenLen=${activeToken.length}`);
+            const activeToken = this.config.refreshToken || this.config.password || this.config.client_secret || '';
+            // Legacy refresh_tokens are the 48-char uppercase-alnum format bluelinky's own
+            // grant_type=refresh_token call expects; CCI ones aren't, and bluelinky rejects
+            // them outright ("Could not manage to get token") - see tokenManager.js. Older
+            // configs saved before tokenType existed are sniffed by format.
+            const isCci = this.config.tokenType === 'cci' ||
+                (!this.config.tokenType && !!activeToken && !/^[A-Z0-9]{48}$/.test(activeToken));
+            this.log.info(`Login to api – token source: ${this.config.refreshToken ? 'refreshToken' : 'client_secret(legacy)'}, tokenLen=${activeToken.length}${isCci ? ' (CCI/CCS mode)' : ''}`);
+
+            let cciPrimed = null;
+            if (isCci) {
+                cciPrimed = await this.prepareCciSession();
+                if (!cciPrimed) {
+                    return; // already logged; either scheduled a retry or is restarting after a fresh full login
+                }
+            }
 
             const loginOptions = {
                 username: this.config.username,
-                password: activeToken,
+                password: isCci ? '' : activeToken,
                 stamp: this.config.stamp,          // eigener Config-Key, nicht client_secret
                 pin: this.config.client_secret_pin,
                 brand: this.config.brand,
                 region: 'EU',
-                language:  this.config.language,
+                language: this.config.language,
+                autoLogin: !isCci,
             };
 
+            // @ts-expect-error brand and language string compatibility for BluelinkyConfig
             blueLinkyClient = new BlueLinky(loginOptions);
             create_tools = new Create_tools(this);
+
+            if (isCci && cciPrimed) {
+                // bluelinky has no public API to prime a session or replace its refresh
+                // logic; `controller` is TS-private only (bracket access sidesteps that
+                // at the type level, same object at runtime - see makeCciRefresher()).
+                const nowSec = Math.floor(Date.now() / 1000);
+                const ctrl = blueLinkyClient['controller'];
+                ctrl.session.accessToken = cciPrimed.accessToken;
+                ctrl.session.tokenExpiresAt = nowSec + (cciPrimed.cci.expiresIn || 3599) - 60;
+                ctrl.refreshAccessToken = this.makeCciRefresher();
+
+                // bluelinky's own login() registers a device ID with the vehicle API as its
+                // last step and uses the server-issued one for every later call; skipping
+                // login() entirely (the whole point, for CCI sessions) skips that too, so
+                // vehicle calls fail with resCode 4002 "Invalid deviceId" unless redone here.
+                try {
+                    const env = ctrl.environment;
+                    ctrl.session.deviceId = await tokenManager.registerDeviceId(
+                        env.endpoints.deviceIdURL, env.ccspServiceID, env.ccspApplicationID,
+                        env.stamp && env.stamp.result, env.pushType,
+                        msg => this.log.debug(msg),
+                    );
+                } catch (err) {
+                    this.log.warn(`[login] CCI device registration failed (${err.message || err}) — vehicle calls will likely fail with "Invalid deviceId"`);
+                }
+            }
 
             blueLinkyClient.on('ready', async (vehicles) => {
                 this.setState('info.connection', true, true);
@@ -492,7 +554,7 @@ return;
                                     this.log.error(`receiveEVInformation Fehler: ${err}`);
                                 }
                             }, 60 * 60 * 1000); // check einmal die stunde nur intern
-                        } catch (error) {
+                        } catch {
                             this.log.error('Error in receiveEVInformation');
                         }
                     }
@@ -508,13 +570,22 @@ return;
                 this.log.error(err);
                 this.log.error('Server is not available or login credentials are wrong');
 
-                // One-shot token renewal on login failure (no loop: flag prevents second attempt)
-                if (!this._renewalAttempted && this.config.password) {
+                // One-shot token renewal on login failure (no loop: flag prevents second attempt
+                // within this process). A saved token restarts the adapter though, so a bug that
+                // keeps failing AFTER a successful renewal (wrong error, e.g.) would otherwise
+                // still loop once per restart - guard against that with a cooldown independent of
+                // the per-process flag, since js-controller's own crash-loop protection only kicks
+                // in after several restarts, by which point real accounts have been hammered.
+                const sinceLastSave = Date.now() - (Number(this.config.lastTokenSaveAt) || 0);
+                const cooldownActive = sinceLastSave < 3 * 60 * 1000;
+                if (!this._renewalAttempted && this.config.password && !cooldownActive) {
                     this._renewalAttempted = true;
                     const renewed = await this.tryRenewToken();
                     if (renewed) {
 return;
 } // adapter restarts automatically with new token
+                } else if (cooldownActive) {
+                    this.log.error(`[login] Not retrying — last token save was only ${Math.round(sinceLastSave / 1000)}s ago. A fresh token clearly isn't fixing this; check the log instead of restart-looping.`);
                 }
 
                 this.log.error('next auto login attempt in 1 hour or restart adapter manual');
@@ -523,6 +594,18 @@ return;
                     await this.login();
                 }, 1000 * 60 * 60);
             });
+
+            if (isCci) {
+                // autoLogin:false - bluelinky never calls controller.login() itself (that call
+                // is exactly what's broken for CCI tokens), so we drive the same
+                // getVehicles()-then-emit sequence its own login() would have done.
+                try {
+                    const vehicles = await blueLinkyClient.getVehicles();
+                    blueLinkyClient.emit('ready', vehicles);
+                } catch (err) {
+                    blueLinkyClient.emit('error', err);
+                }
+            }
         } catch (error) {
             this.log.error('Error in login/on function');
             if (typeof error === 'string') {
@@ -531,6 +614,84 @@ return;
                 this.log.error(error.message);
             }
         }
+    }
+
+    /**
+     * Get a fresh CCS access token for the CCI/OneApp login path (see tokenManager.js),
+     * without going through bluelinky's own (incompatible) refresh/login. Tries a cheap
+     * CCI token-refresh using the persisted CCI token set first; only falls back to a
+     * full username/password login if that fails (e.g. the persisted CCI refresh token
+     * has gone stale). A full login persists a fresh token set via saveTokenToConfig,
+     * which restarts this adapter instance - the restarted process then refreshes
+     * cleanly from what was just saved.
+     *
+     * @returns {Promise<{accessToken: string, cci: object}|null>} null means login() should
+     *          stop - either a retry was scheduled, or a restart is already underway.
+     */
+    async prepareCciSession() {
+        let cciSet = null;
+        try {
+            if (this.config.cciTokenSet) {
+                // js-controller already decrypts native fields listed in io-package.json's
+                // encryptedNative into this.config.* on adapter start - unlike
+                // saveTokenToConfig()'s direct setForeignObjectAsync write, which bypasses
+                // that pipeline and has to call this.encrypt() itself.
+                cciSet = JSON.parse(this.config.cciTokenSet);
+            }
+        } catch (e) {
+            this.log.warn('[prepareCciSession] Stored CCI token set unreadable — forcing full login');
+        }
+
+        if (cciSet && cciSet.refreshToken) {
+            try {
+                const refreshed = await tokenManager.refreshCciToken(this.config.brand, cciSet, msg => this.log.debug(msg));
+                this._cciTokenSet = refreshed.cci;
+                return refreshed;
+            } catch (err) {
+                this.log.warn(`[prepareCciSession] CCI token refresh failed (${err.message || err}) — falling back to full login`);
+            }
+        }
+
+        if (!this.config.username || !this.config.password) {
+            this.log.error('[prepareCciSession] No valid CCI token and no username/password for a full login');
+            this.setState('info.connection', false, true);
+            return null;
+        }
+
+        try {
+            const full = await tokenManager.fetchToken(this.config.brand, this.config.username, this.config.password, msg => this.log.debug(msg));
+            await this.saveTokenToConfig(full.refreshToken, full.expiresAt, { cci: full.cci });
+            if (!full.cci) {
+                this.log.info('[prepareCciSession] Obtained a legacy-format token instead — adapter restarts into the legacy flow');
+                return null;
+            }
+            this._cciTokenSet = full.cci;
+            return { accessToken: full.accessToken, cci: full.cci };
+        } catch (err) {
+            this.log.error(`[prepareCciSession] Full login failed: ${err.message || err}`);
+            this.setState('info.connection', false, true);
+            adapterIntervals.loginRetryTimeout = setTimeout(async () => {
+ await this.login(); 
+}, 1000 * 60 * 60);
+            return null;
+        }
+    }
+
+    /** Replacement for bluelinky's own controller.refreshAccessToken() when using a CCI/CCS session. */
+    makeCciRefresher() {
+        return async () => {
+            const sess = blueLinkyClient['controller'].session;
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (nowSec < sess.tokenExpiresAt - 10) {
+                return 'Token not expired, no need to refresh';
+            }
+            const refreshed = await tokenManager.refreshCciToken(this.config.brand, this._cciTokenSet, msg => this.log.debug(msg));
+            this._cciTokenSet = refreshed.cci;
+            sess.accessToken = refreshed.accessToken;
+            sess.tokenExpiresAt = Math.floor(Date.now() / 1000) + (refreshed.cci.expiresIn || 3599) - 60;
+            this.log.info('[refreshAccessToken] CCS token refreshed via CCI (kept in memory, not persisted)');
+            return 'Token refreshed';
+        };
     }
 
     //read new sates from vehicle
@@ -549,7 +710,7 @@ return;
                 continue;
             }
 
-            if (this.batteryState12V[vin] && batteryControlState12V && this.batteryState12V[vin] < batteryControlState12V.val && force_update_obj.val) {
+            if (this.batteryState12V[vin] && batteryControlState12V?.val != null && this.batteryState12V[vin] < Number(batteryControlState12V.val) && force_update_obj.val) {
                 this.log.warn(`Vin${  vin  } 12V Battery state is low: ${  vin  } ${  this.batteryState12V[vin]  }%. Recharge to prevent damage!`);
                 if (this.config.protectAgainstDeepDischarge && !force) {
                     this.log.warn('Auto Refresh is disabled, only use force refresh to reenable refresh if you are willing to risk your battery');
@@ -583,6 +744,25 @@ return;
 
             if(force_update) {
                 this.log.info(`Read new update for ${  vin  } directly from the car`);
+                if (vehicle && vehicle.controller && typeof vehicle.controller.getVehicleHttpService === 'function') {
+                    try {
+                        const httpService = await vehicle.controller.getVehicleHttpService();
+                        const vehicleId = vehicle.vehicleConfig.id;
+                        if (vehicle.vehicleConfig.ccuCCS2ProtocolSupport) {
+                            this.log.debug(`Sending POST /api/v2/spa/vehicles/${vehicleId}/ccs2/carstatus to force live status update for ${vin}...`);
+                            await httpService.post(`/api/v2/spa/vehicles/${vehicleId}/ccs2/carstatus`, {
+                                body: { deviceId: vehicle.controller.session.deviceId }
+                            });
+                        } else {
+                            this.log.debug(`Sending POST /api/v2/spa/vehicles/${vehicleId}/status to force live status update for ${vin}...`);
+                            await httpService.post(`/api/v2/spa/vehicles/${vehicleId}/status`, {
+                                body: { deviceId: vehicle.controller.session.deviceId }
+                            });
+                        }
+                    } catch (postErr) {
+                        this.log.debug(`POST live status request failed for ${vin}: ${postErr}`);
+                    }
+                }
             } else {
                 this.log.info(`Read new update for ${  vin  } from the server`);
             }
@@ -607,21 +787,8 @@ return;
                 } else {
                     // neue struktur ohne auflösung
                     await tools.cleanNotAvailableObjects(this, vin);
-                    // location sonderlocke
-                    if (newStatus.hasOwnProperty('Location')) {   // beniziner haben anscheinenden keine location
-                    	await tools.setLocation(this, vin, newStatus.Location.GeoCoord.Latitude, newStatus.Location.GeoCoord.Longitude, newStatus.Location.Speed.Value);
-                    } else {
-                        // new API format (Body structure): Location not in fullStatus – separate call
-                        try {
-                            const loc = await vehicle.location();
-                            if (loc && loc.latitude != null && loc.longitude != null) {
-                                await tools.setLocation(this, vin, loc.latitude, loc.longitude, loc.speed?.value ?? 0);
-                            }
-                        } catch (locErr) {
-                            this.log.warn(`vehicle.location() failed: ${locErr}`);
-                        }
-                    }
                 }
+                await this.processLocationData(vehicle, vin, newStatus);
 
             } catch (error) {
                 if (typeof error === 'string') {
@@ -647,21 +814,8 @@ return;
                     } else {
                         // neue struktur ohne auflösung
                         await tools.cleanNotAvailableObjects(this, vin);
-                        // location sonderlocke
-                        if (newStatus.hasOwnProperty('Location')) {   // beniziner haben anscheinenden keine location
-                        	await tools.setLocation(this, vin, newStatus.Location.GeoCoord.Latitude, newStatus.Location.GeoCoord.Longitude, newStatus.Location.Speed.Value);
-                        } else {
-                            // new API format: separate location call
-                            try {
-                                const loc = await vehicle.location();
-                                if (loc && loc.latitude != null && loc.longitude != null) {
-                                    await tools.setLocation(this, vin, loc.latitude, loc.longitude, loc.speed?.value ?? 0);
-                                }
-                            } catch (locErr) {
-                                this.log.warn(`vehicle.location() failed: ${locErr}`);
-                            }
-                        }
                     }
+                    await this.processLocationData(vehicle, vin, newStatus);
                 }
             }
 
@@ -718,6 +872,151 @@ return;
             await this.setStateAsync(`${vin}.odometer.value`, {val: odometer, ack: true});
         }
     }
+
+    extractCoordsFromPayload(obj) {
+        if (!obj || typeof obj !== 'object') {
+            return null;
+        }
+
+        const target = obj.gpsDetail || obj.coord || obj.Coord || obj.GeoCoord || obj.resMsg?.gpsDetail || obj;
+
+        const lat = obj.latitude ?? obj.lat ?? obj.Latitude ??
+                    target.latitude ?? target.lat ?? target.Latitude ??
+                    obj.coord?.lat ?? obj.coord?.latitude ?? obj.coord?.Latitude ??
+                    obj.Coord?.lat ?? obj.Coord?.latitude ?? obj.Coord?.Latitude ??
+                    obj.GeoCoord?.Latitude ?? obj.GeoCoord?.lat ??
+                    obj.vehicleLocation?.coord?.lat ?? obj.vehicleLocation?.latitude ?? obj.vehicleLocation?.lat;
+
+        const lon = obj.longitude ?? obj.lon ?? obj.lng ?? obj.Longitude ??
+                    target.longitude ?? target.lon ?? target.lng ?? target.Longitude ??
+                    obj.coord?.lon ?? obj.coord?.longitude ?? obj.coord?.Longitude ??
+                    obj.Coord?.lon ?? obj.Coord?.longitude ?? obj.Coord?.Longitude ??
+                    obj.GeoCoord?.Longitude ?? obj.GeoCoord?.lon ??
+                    obj.vehicleLocation?.coord?.lon ?? obj.vehicleLocation?.longitude ?? obj.vehicleLocation?.lon;
+
+        const speedObj = obj.speed ?? obj.Speed ?? target.speed ?? target.Speed;
+        const speed = typeof speedObj === 'object' ? (speedObj?.value ?? speedObj?.Value ?? 0) : (speedObj ?? 0);
+
+        if (lat != null && lon != null && !isNaN(Number(lat)) && !isNaN(Number(lon))) {
+            const numLat = Number(lat);
+            const numLon = Number(lon);
+            if (numLat === 0 && numLon === 0) {
+                return null;
+            }
+            return {
+                lat: numLat,
+                lon: numLon,
+                speed: typeof speed === 'number' ? speed : (Number(speed) || 0)
+            };
+        }
+        return null;
+    }
+
+    async processLocationData(vehicle, vin, newStatus) {
+        let locationFound = false;
+        let coords = null;
+
+        // 1. Query dedicated vehicle.location() endpoint first (same GET /location API endpoint used by official app)
+        if (vehicle && typeof vehicle.location === 'function') {
+            try {
+                this.log.debug(`Requesting dedicated vehicle.location() for ${vin}...`);
+                const loc = await vehicle.location();
+                this.log.debug(`vehicle.location() raw response for ${vin}: ${JSON.stringify(loc)}`);
+                const locCoords = this.extractCoordsFromPayload(loc);
+                if (locCoords) {
+                    coords = locCoords;
+                    this.log.debug(`Location obtained from vehicle.location() for ${vin}: lat=${coords.lat}, lon=${coords.lon}`);
+                }
+            } catch (locErr) {
+                this.log.debug(`vehicle.location() API call failed for ${vin}: ${locErr}`);
+            }
+        }
+
+        // 2. Fallback to status payload if vehicle.location() returned no valid coordinates
+        if (!coords && newStatus) {
+            if (newStatus.vehicleLocation) {
+                coords = this.extractCoordsFromPayload(newStatus.vehicleLocation);
+            }
+            if (!coords && newStatus.Location) {
+                coords = this.extractCoordsFromPayload(newStatus.Location);
+            }
+            if (!coords && newStatus.gpsDetail) {
+                coords = this.extractCoordsFromPayload(newStatus.gpsDetail);
+            }
+            if (!coords && newStatus.vehicleStatus?.vehicleLocation) {
+                coords = this.extractCoordsFromPayload(newStatus.vehicleStatus.vehicleLocation);
+            }
+            if (!coords && newStatus.vehicleStatus?.location) {
+                coords = this.extractCoordsFromPayload(newStatus.vehicleStatus.location);
+            }
+            if (!coords && newStatus.vehicleStatusInfo?.vehicleStatus?.vehicleLocation) {
+                coords = this.extractCoordsFromPayload(newStatus.vehicleStatusInfo.vehicleStatus.vehicleLocation);
+            }
+            if (!coords && newStatus.ccs2Status?.state?.Vehicle?.Location) {
+                coords = this.extractCoordsFromPayload(newStatus.ccs2Status.state.Vehicle.Location);
+            }
+            if (!coords && newStatus.ccs2Status?.state?.Vehicle?.location) {
+                coords = this.extractCoordsFromPayload(newStatus.ccs2Status.state.Vehicle.location);
+            }
+            if (!coords && newStatus.resMsg?.gpsDetail) {
+                coords = this.extractCoordsFromPayload(newStatus.resMsg.gpsDetail);
+            }
+        }
+
+        if (coords) {
+            await tools.setLocation(this, vin, coords.lat, coords.lon, coords.speed);
+            locationFound = true;
+        } else {
+            this.log.warn(`No valid location coordinates could be parsed for ${vin}`);
+        }
+
+        return locationFound;
+    }
+
+    async forceVehicleLocation(vehicle, vin) {
+        try {
+            this.log.info(`Requesting live location update from car for ${vin}...`);
+            let coords = null;
+
+            if (vehicle && vehicle.controller && typeof vehicle.controller.getVehicleHttpService === 'function') {
+                try {
+                    const httpService = await vehicle.controller.getVehicleHttpService();
+                    const vehicleId = vehicle.vehicleConfig.id;
+                    if (vehicle.vehicleConfig.ccuCCS2ProtocolSupport) {
+                        this.log.debug(`Sending POST /api/v2/spa/vehicles/${vehicleId}/ccs2/carstatus to wake up car telematics for ${vin}...`);
+                        await httpService.post(`/api/v2/spa/vehicles/${vehicleId}/ccs2/carstatus`, {
+                            body: { deviceId: vehicle.controller.session.deviceId }
+                        });
+                    } else {
+                        this.log.debug(`Sending POST /api/v2/spa/vehicles/${vehicleId}/status to wake up car telematics for ${vin}...`);
+                        await httpService.post(`/api/v2/spa/vehicles/${vehicleId}/status`, {
+                            body: { deviceId: vehicle.controller.session.deviceId }
+                        });
+                    }
+                } catch (httpErr) {
+                    this.log.debug(`Telematics wake-up request failed for ${vin}: ${httpErr}`);
+                }
+            }
+
+            if (!coords && vehicle && typeof vehicle.location === 'function') {
+                const loc = await vehicle.location();
+                this.log.debug(`vehicle.location() raw response for ${vin}: ${JSON.stringify(loc)}`);
+                coords = this.extractCoordsFromPayload(loc);
+            }
+
+            if (!coords) {
+                this.log.info(`No valid coords from location API, triggering full force refresh from car for ${vin}...`);
+                await this.readStatusVin(vehicle, true);
+                return;
+            }
+
+            await tools.setLocation(this, vin, coords.lat, coords.lon, coords.speed);
+            this.log.info(`Vehicle location updated successfully for ${vin}: lat=${coords.lat}, lon=${coords.lon}`);
+        } catch (err) {
+            this.log.error(`Error forcing vehicle location update for ${vin}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+
 
     async receiveEVInformation(vehicle, manu) {
         const tickHour = new Date().getHours(); // um 23 uhr daten festschreiben
@@ -836,17 +1135,13 @@ return;
     getToday() {
         const today = new Date();
         const yyyy = today.getFullYear();
-        let mm = today.getMonth() + 1;
-        let dd = today.getDate();
+        const mm = today.getMonth() + 1;
+        const dd = today.getDate();
 
-        if (dd < 10) {
- dd = `0${dd}`; 
-}
-        if (mm < 10) {
- mm = `0${mm}`; 
-}
+        const ddStr = dd < 10 ? `0${dd}` : String(dd);
+        const mmStr = mm < 10 ? `0${mm}` : String(mm);
 
-        return `${yyyy}${mm}${dd}`;
+        return `${yyyy}${mmStr}${ddStr}`;
     }
 
     //short status
@@ -898,15 +1193,12 @@ return;
                 this.batteryState12V[vin] = newStatus.engine.batteryCharge12v;
             }
         } catch (err) {
-            this.log.error(err.stack);
+            this.log.error(err instanceof Error ? err.stack || err.message : String(err));
         }
     }
 
     //full status
     async setNewFullStatus(newStatus, vin) {
-
-        let lastUpdate = '0'; // als String, da ccs2-Vergleich lastUpdate_ccs2 ebenfalls ein String ist
-
         try {
             await this.setStateAsync(`${vin  }.vehicleStatus.airCtrlOn`, {
                 val: newStatus.vehicleStatus.airCtrlOn,
@@ -920,12 +1212,7 @@ return;
                 });
             }
 
-            if (newStatus.hasOwnProperty('vehicleLocation')) {
-                if (newStatus.vehicleLocation != undefined) {
-                    lastUpdate = String(newStatus.vehicleLocation.time);
-                    await tools.setLocation(this, vin, newStatus.vehicleLocation.coord.lat, newStatus.vehicleLocation.coord.lon, newStatus.vehicleLocation.speed.value);
-                }
-            }
+
 
 
             //Charge
@@ -971,27 +1258,37 @@ return;
 		            }
 
                     //Nur für Elektro Fahrzeuge - Battery
-                    if (newStatus.vehicleStatus.evStatus.drvDistance && newStatus.vehicleStatus.evStatus.drvDistance.length > 0) {
-                        await this.setStateAsync(`${vin  }.vehicleStatus.dte`, {
-                            val: newStatus.vehicleStatus.evStatus.drvDistance[0].rangeByFuel.totalAvailableRange.value,
-                            ack: true,
-                        });
+                    const evStatus = newStatus.vehicleStatus?.evStatus;
+                    if (evStatus?.drvDistance && evStatus.drvDistance.length > 0) {
+                        const drvDist = evStatus.drvDistance[0];
+                        if (drvDist?.rangeByFuel) {
+                            if (drvDist.rangeByFuel.totalAvailableRange?.value !== undefined) {
+                                await this.setStateAsync(`${vin  }.vehicleStatus.dte`, {
+                                    val: drvDist.rangeByFuel.totalAvailableRange.value,
+                                    ack: true,
+                                });
+                            }
 
-                        let evRange = newStatus.vehicleStatus.evStatus.drvDistance[0].rangeByFuel.evModeRange.value;
-                        if (evRange < 1 && this.config.batteryRange > 0) {
-                            evRange = Math.round(((newStatus.vehicleStatus.evStatus.batteryStatus / 100) * this.config.batteryRange)*100)/100;
-                        }
-                        await this.setStateAsync(`${vin  }.vehicleStatus.evModeRange`, {
-                            val: evRange,
-                            ack: true,
-                        });
+                            const batteryStatus = evStatus.batteryStatus;
+                            const batteryRangeConfig = Number(this.config?.batteryRange) || 0;
+                            if (drvDist.rangeByFuel.evModeRange?.value !== undefined) {
+                                let evRange = drvDist.rangeByFuel.evModeRange.value;
+                                if (evRange < 1 && batteryRangeConfig > 0 && typeof batteryStatus === 'number') {
+                                    evRange = Math.round(((batteryStatus / 100) * batteryRangeConfig) * 100) / 100;
+                                }
+                                await this.setStateAsync(`${vin  }.vehicleStatus.evModeRange`, {
+                                    val: evRange,
+                                    ack: true,
+                                });
+                            }
 
-                        if (newStatus.vehicleStatus.evStatus.drvDistance[0].rangeByFuel.hasOwnProperty('gasModeRange')) {
-                            //Only for PHEV
-                            await this.setStateAsync(`${vin  }.vehicleStatus.gasModeRange`, {
-                                val: newStatus.vehicleStatus.evStatus.drvDistance[0].rangeByFuel.gasModeRange.value,
-                                ack: true,
-                            });
+                            if (drvDist.rangeByFuel.gasModeRange?.value !== undefined) {
+                                //Only for PHEV
+                                await this.setStateAsync(`${vin  }.vehicleStatus.gasModeRange`, {
+                                    val: drvDist.rangeByFuel.gasModeRange.value,
+                                    ack: true,
+                                });
+                            }
                         }
                     }
 
@@ -1026,21 +1323,7 @@ return;
             if (newStatus.hasOwnProperty('ccs2Status')) {
 		        this.log.debug(`ccs2Status: ${  JSON.stringify(newStatus.ccs2Status)}`);
 
-                if (newStatus.ccs2Status.state.Vehicle.hasOwnProperty('Location')) {
-                    const ts = newStatus.ccs2Status.state.Vehicle.Location.TimeStamp;
 
-                    const lastUpdate_ccs2 =
-                        String(ts.Year) +
-                        String(ts.Mon).padStart(2, '0') +
-                        String(ts.Day).padStart(2, '0') +
-                        String(ts.Hour).padStart(2, '0') +
-                        String(ts.Min).padStart(2, '0') +
-                        String(ts.Sec).padStart(2, '0');
-
-                    if (lastUpdate_ccs2 > lastUpdate) {
-                        await tools.setLocation(this, vin, newStatus.ccs2Status.state.Vehicle.Location.GeoCoord.Latitude, newStatus.ccs2Status.state.Vehicle.Location.GeoCoord.Longitude, newStatus.ccs2Status.state.Vehicle.Location.Speed.Value);
-                    }
-                }
 
                 // Battery
                 await this.setStateAsync(`${vin  }.vehicleStatus.battery.soc-12V`, {
@@ -1056,13 +1339,13 @@ return;
                         });
                     }
                 }
-                if (newStatus.ccs2Status.state.Vehicle.Green.ChargingInformation.hasOwnProperty('ConnectorFastening')) {
+                if (newStatus.ccs2Status.state.Vehicle.Green?.ChargingInformation?.hasOwnProperty('ConnectorFastening')) {
 	                await this.setStateAsync(`${vin  }.vehicleStatus.battery.charge`, {
 	                    val: newStatus.ccs2Status.state.Vehicle.Green.ChargingInformation.ConnectorFastening.State == 1 ? true : false,
 	                    ack: true
 	                });
                 }
-                if (newStatus.ccs2Status.state.Vehicle.Green.ChargingInformation.hasOwnProperty('Charging')) {
+                if (newStatus.ccs2Status.state.Vehicle.Green?.ChargingInformation?.hasOwnProperty('Charging')) {
 	                await this.setStateAsync(`${vin  }.vehicleStatus.battery.minutes_to_charged`, {
 	                    val: newStatus.ccs2Status.state.Vehicle.Green.ChargingInformation.Charging.RemainTime,
 	                    ack: true,
@@ -1154,8 +1437,10 @@ return;
                 this.batteryState12V[vin] = newStatus.vehicleStatus.battery.batSoc;
             }
         } catch (err) {
-            this.log.error(err.message);
-            this.log.error(err.stack);
+            this.log.error(err instanceof Error ? err.message : String(err));
+            if (err instanceof Error && err.stack) {
+                this.log.error(err.stack);
+            }
         }
     }
 
