@@ -62,7 +62,6 @@ class Bluelink extends utils.Adapter {
         this.on('ready', this.onReady.bind(this));
         this.on('stateChange', this.onStateChange.bind(this));
         this.on('unload', this.onUnload.bind(this));
-        this.on('message', this.onMessage.bind(this));
         this.vehiclesDict = {};
         this.batteryState12V = {};
         this.vehicles = [];
@@ -389,54 +388,6 @@ return;
             return;
         }
         await this.tryRenewToken();
-    }
-
-    /**
-     * Handle sendTo messages from admin UI.
-     *
-     * @param {ioBroker.Message} obj Message object received from admin UI
-     */
-    onMessage(obj) {
-        if (!obj || !obj.command) {
-return;
-}
-
-        if (obj.command === 'fetchToken') {
-            this.log.info('[fetchToken] Message received from admin UI');
-
-            // Always respond — if callback is never called the GUI stays grey forever
-            const respond = (payload) => {
-                if (obj.callback) {
-                    this.sendTo(obj.from, obj.command, payload, obj.callback);
-                }
-            };
-
-            const username = this.config.username;
-            const password = this.config.password;
-            const brand    = this.config.brand;
-
-            this.log.info(`[fetchToken] brand=${brand} username=${username} password-set=${!!password}`);
-
-            if (!username || !password || !brand) {
-                const msg = `Save settings first. Missing: ${[!username && 'username', !password && 'password', !brand && 'brand'].filter(Boolean).join(', ')}`;
-                this.log.error(`[fetchToken] ${msg}`);
-                respond({ _fetchTokenResult: `FEHLER: ${msg}` });
-                return;
-            }
-
-            // Fetch token, save directly to adapter native config, then respond
-            tokenManager.fetchToken(brand, username, password, msg => this.log.debug(msg))
-                .then(async (result) => {
-                    this.log.info(`[fetchToken] Success – token valid until ${result.expiresAt}`);
-                    await this.saveTokenToConfig(result.refreshToken, result.expiresAt, { cci: result.cci });
-                    respond({ _fetchTokenResult: `Token gespeichert (gültig bis ${result.expiresAt}). Adapter startet automatisch neu.` });
-                })
-                .catch((err) => {
-                    this.log.error(`[fetchToken] Failed: ${err.message || err}`);
-                    respond({ _fetchTokenResult: `FEHLER: ${err.message || err}` });
-                });
-        }
-
     }
 
     /**

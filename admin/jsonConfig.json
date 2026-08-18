@@ -132,60 +132,27 @@
             "lg": 3,
             "xl": 3
         },
-        "client_secret": {
-            "type": "text",
-            "hidden": "true"
-        },
-        "header_Token": {
-            "type": "header",
-            "text": "Token",
-            "size": 2,
-            "newLine": true
-        },
-        "_fetchTokenBtn": {
-            "type": "sendTo",
-            "label": "Fetch / refresh token now",
-            "command": "fetchToken",
-            "data": {},
-            "newLine": true,
-            "xs": 12,
-            "sm": 12,
-            "md": 5,
-            "lg": 4,
-            "xl": 4
-        },
-        "_fetchTokenHint": {
-            "type": "staticText",
-            "text": "fetchTokenHint",
-            "xs": 12,
-            "sm": 12,
-            "md": 7,
-            "lg": 8,
-            "xl": 8
-        },
         "tokenExpiry": {
             "type": "text",
             "label": "Token valid until (auto-managed)",
             "disabled": "true",
-            "newLine": true,
             "xs": 12,
             "sm": 12,
             "md": 4,
             "lg": 3,
             "xl": 3
         },
+        "client_secret": {
+            "type": "text",
+            "hidden": "true"
+        },
         "_fallbackPanel": {
             "type": "panel",
-            "label": "Falls der Button oben nicht funktioniert",
+            "label": "Fallback",
             "collapsible": true,
             "expanded": false,
             "newLine": true,
             "items": {
-                "_fallbackHelp": {
-                    "type": "staticText",
-                    "text": "Token manuell via Python-Skript holen und hier eintragen.",
-                    "newLine": true
-                },
                 "refreshToken": {
                     "type": "password",
                     "label": "Refresh Token",
