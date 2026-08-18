@@ -163,22 +163,11 @@
             "lg": 8,
             "xl": 8
         },
-        "refreshToken": {
-            "type": "password",
-            "label": "Refresh Token",
-            "help": "fetchTokenHelp",
-            "repeat": false,
-            "newLine": true,
-            "xs": 12,
-            "sm": 12,
-            "md": 8,
-            "lg": 6,
-            "xl": 6
-        },
         "tokenExpiry": {
             "type": "text",
             "label": "Token valid until (auto-managed)",
             "disabled": "true",
+            "newLine": true,
             "xs": 12,
             "sm": 12,
             "md": 4,
@@ -194,8 +183,20 @@
             "items": {
                 "_fallbackHelp": {
                     "type": "staticText",
-                    "text": "Token manuell via Python-Skript holen und in das Refresh-Token-Feld oben eintragen.",
+                    "text": "Token manuell via Python-Skript holen und hier eintragen.",
                     "newLine": true
+                },
+                "refreshToken": {
+                    "type": "password",
+                    "label": "Refresh Token",
+                    "help": "fetchTokenHelp",
+                    "repeat": false,
+                    "newLine": true,
+                    "xs": 12,
+                    "sm": 12,
+                    "md": 8,
+                    "lg": 6,
+                    "xl": 6
                 },
                 "_fallbackDocLink": {
                     "type": "staticLink",
