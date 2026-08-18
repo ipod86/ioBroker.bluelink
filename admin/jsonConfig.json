@@ -154,7 +154,7 @@
         },
         "_fallbackHelp": {
             "type": "staticText",
-            "text": "Falls der Login mit Benutzername/Passwort nicht klappt: Token manuell eintragen. Zum Generieren siehe Anleitung unten.",
+            "text": "Falls der Login mit Benutzername/Passwort nicht klappt: Token manuell eintragen. Zum Generieren siehe Anleitung unten. Für automatische Erneuerung müssen oben trotzdem Benutzername und Passwort gesetzt sein — hilft aber nichts, wenn genau der automatische Login der Grund für den Fallback war. Dann muss bei Ablauf wieder von Hand ein neues Token eingetragen werden.",
             "newLine": true
         },
         "refreshToken": {
