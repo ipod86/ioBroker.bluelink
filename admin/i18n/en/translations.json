@@ -18,6 +18,5 @@
     "only for PHEV": "only for PHEV",
     "Token-documentation": "Token documentation",
     "Password": "Password (account password)",
-    "Token valid until (auto-managed)": "Refresh token valid until (auto-managed)",
-    "fetchTokenHelp": "Usually filled in automatically — only enter one here for the manual fallback."
+    "Token valid until (auto-managed)": "Refresh token valid until (auto-managed)"
 }

@@ -146,38 +146,34 @@
             "type": "text",
             "hidden": "true"
         },
-        "_fallbackPanel": {
-            "type": "panel",
-            "label": "Fallback",
-            "collapsible": true,
-            "expanded": false,
+        "header_Fallback": {
+            "type": "header",
+            "text": "Fallback",
+            "size": 2,
+            "newLine": true
+        },
+        "refreshToken": {
+            "type": "password",
+            "label": "Refresh Token",
+            "repeat": false,
             "newLine": true,
-            "items": {
-                "refreshToken": {
-                    "type": "password",
-                    "label": "Refresh Token",
-                    "help": "fetchTokenHelp",
-                    "repeat": false,
-                    "newLine": true,
-                    "xs": 12,
-                    "sm": 12,
-                    "md": 8,
-                    "lg": 6,
-                    "xl": 6
-                },
-                "_fallbackDocLink": {
-                    "type": "staticLink",
-                    "label": "Anleitung: bluelink_refresh_token",
-                    "button": true,
-                    "href": "https://github.com/RustyDust/bluelink_refresh_token",
-                    "newLine": true,
-                    "xs": 12,
-                    "sm": 12,
-                    "md": 6,
-                    "lg": 4,
-                    "xl": 4
-                }
-            }
+            "xs": 12,
+            "sm": 12,
+            "md": 8,
+            "lg": 6,
+            "xl": 6
+        },
+        "_fallbackDocLink": {
+            "type": "staticLink",
+            "label": "Anleitung: bluelink_refresh_token",
+            "button": true,
+            "href": "https://github.com/RustyDust/bluelink_refresh_token",
+            "newLine": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 6,
+            "lg": 4,
+            "xl": 4
         },
         "Api settings": {
             "type": "header",

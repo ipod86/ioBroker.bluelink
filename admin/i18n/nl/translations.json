@@ -17,6 +17,5 @@
     "only for PHEV": "alleen voor PHEV",
     "Token-documentation": "Tokendocumentatie",
     "Password": "Wachtwoord (accountwachtwoord)",
-    "Token valid until (auto-managed)": "Vernieuwingstoken geldig tot (automatisch beheerd)",
-    "fetchTokenHelp": "Ingevuld door de knop. Start adapter opnieuw na ophalen."
+    "Token valid until (auto-managed)": "Vernieuwingstoken geldig tot (automatisch beheerd)"
 }
