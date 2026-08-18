@@ -152,6 +152,11 @@
             "size": 2,
             "newLine": true
         },
+        "_fallbackHelp": {
+            "type": "staticText",
+            "text": "Falls der Login mit Benutzername/Passwort nicht klappt: Token manuell eintragen. Zum Generieren siehe Anleitung unten.",
+            "newLine": true
+        },
         "refreshToken": {
             "type": "password",
             "label": "Refresh Token",
