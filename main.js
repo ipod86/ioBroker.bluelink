@@ -437,23 +437,6 @@ return;
                 });
         }
 
-        if (obj.command === 'showCredentials') {
-            const creds = JSON.stringify({
-                username: this.config.username || '',
-                password: this.config.password || '',
-                pin:      this.config.client_secret_pin || '',
-            }, null, 2);
-            this.setObjectNotExists('info.credentials', {
-                type: 'state',
-                common: { name: 'Credentials (plain)', type: 'string', role: 'text', read: true, write: false },
-                native: {},
-            }, () => {
- this.setState('info.credentials', creds, true); 
-});
-            if (obj.callback) {
-                this.sendTo(obj.from, obj.command, `Zugangsdaten in DP info.credentials geschrieben.`, obj.callback);
-            }
-        }
     }
 
     /**

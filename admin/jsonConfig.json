@@ -197,18 +197,6 @@
                     "text": "Falls der automatische Token-Abruf oben dauerhaft fehlschlägt: Token manuell via Python-Skript holen und in das Refresh-Token-Feld oben eintragen.",
                     "newLine": true
                 },
-                "_showCredentialsBtn": {
-                    "type": "sendTo",
-                    "label": "Gespeicherte Zugangsdaten anzeigen",
-                    "command": "showCredentials",
-                    "data": {},
-                    "newLine": true,
-                    "xs": 12,
-                    "sm": 12,
-                    "md": 5,
-                    "lg": 4,
-                    "xl": 4
-                },
                 "_fallbackDocLink": {
                     "type": "staticLink",
                     "label": "Anleitung: bluelink_refresh_token",
