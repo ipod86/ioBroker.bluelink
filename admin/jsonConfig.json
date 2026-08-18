@@ -136,16 +136,65 @@
             "type": "text",
             "hidden": "true"
         },
+        "header_Token": {
+            "type": "header",
+            "text": "Token",
+            "size": 2,
+            "newLine": true
+        },
+        "_fetchTokenBtn": {
+            "type": "sendTo",
+            "label": "Fetch / refresh token now",
+            "command": "fetchToken",
+            "data": {},
+            "newLine": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 5,
+            "lg": 4,
+            "xl": 4
+        },
+        "_fetchTokenHint": {
+            "type": "staticText",
+            "text": "fetchTokenHint",
+            "xs": 12,
+            "sm": 12,
+            "md": 7,
+            "lg": 8,
+            "xl": 8
+        },
+        "refreshToken": {
+            "type": "password",
+            "label": "Refresh Token",
+            "help": "fetchTokenHelp",
+            "repeat": false,
+            "newLine": true,
+            "xs": 12,
+            "sm": 12,
+            "md": 8,
+            "lg": 6,
+            "xl": 6
+        },
+        "tokenExpiry": {
+            "type": "text",
+            "label": "Token valid until (auto-managed)",
+            "disabled": "true",
+            "xs": 12,
+            "sm": 12,
+            "md": 4,
+            "lg": 3,
+            "xl": 3
+        },
         "_fallbackPanel": {
             "type": "panel",
-            "label": "Token (Fallback — manuell eintragen)",
+            "label": "Manueller Fallback (nur falls der Button oben fehlschlägt)",
             "collapsible": true,
             "expanded": false,
             "newLine": true,
             "items": {
                 "_fallbackHelp": {
                     "type": "staticText",
-                    "text": "Falls der automatische Token-Abruf gesperrt ist: Token manuell via Python-Skript holen und hier eintragen.",
+                    "text": "Falls der automatische Token-Abruf oben dauerhaft fehlschlägt: Token manuell via Python-Skript holen und in das Refresh-Token-Feld oben eintragen.",
                     "newLine": true
                 },
                 "_showCredentialsBtn": {
@@ -171,28 +220,6 @@
                     "md": 6,
                     "lg": 4,
                     "xl": 4
-                },
-                "refreshToken": {
-                    "type": "password",
-                    "label": "Refresh Token",
-                    "repeat": false,
-                    "newLine": true,
-                    "xs": 12,
-                    "sm": 12,
-                    "md": 8,
-                    "lg": 6,
-                    "xl": 6
-                },
-                "tokenExpiry": {
-                    "type": "text",
-                    "label": "Token gültig bis (auto)",
-                    "disabled": "true",
-                    "newLine": true,
-                    "xs": 12,
-                    "sm": 12,
-                    "md": 4,
-                    "lg": 3,
-                    "xl": 3
                 }
             }
         },
