@@ -144,8 +144,6 @@ class Bluelink extends utils.Adapter {
         if (loginGo) {
             await this.ensureRefreshToken();
             await this.login();
-        } else {
-            this.terminate('Invalid configuration: Username or engine type missing', 11);
         }
     }
 
