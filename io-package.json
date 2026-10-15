@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "bluelink",
-    "version": "3.2.0-alpha.2",
+    "version": "3.2.0-alpha.3",
     "news": {
       "3.1.34": {
         "en": "fix location request",
@@ -195,6 +195,7 @@
     "request": 100,
     "evHistory": true,
     "protectAgainstDeepDischarge": true,
+    "locationEveryPoll": false,
     "errorCounter": 5,
     "language": "de",
     "resAddress": false,
